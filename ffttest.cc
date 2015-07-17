@@ -37,10 +37,10 @@ cl_mem                  _tmpBuffer = 0;
 clfftPlanHandle         _planHandle = 0;
 
 // Data buffer
-cl_float*               _inReal  = 0;
-cl_float*               _inImag  = 0;
-cl_float*               _outReal = 0;
-cl_float*               _outImag = 0;
+cl_double*               _inReal  = 0;
+cl_double*               _inImag  = 0;
+cl_double*               _outReal = 0;
+cl_double*               _outImag = 0;
 
 void populate() {
     
@@ -48,30 +48,19 @@ void populate() {
 
     // Real and Imaginary arrays. 
     if (0 == _inReal) {
-        cl_float* _inReal  = (cl_float*) malloc (_fft_size * sizeof (cl_float));
-        cl_float* _inImag  = (cl_float*) malloc (_fft_size * sizeof (cl_float));
-        cl_float* _outReal = (cl_float*) malloc (_fft_size * sizeof (cl_float));
-        cl_float* _outImag = (cl_float*) malloc (_fft_size * sizeof (cl_float));
+        _inReal  = (cl_double*) malloc (_fft_size * sizeof (cl_double));
+        _inImag  = (cl_double*) malloc (_fft_size * sizeof (cl_double));
+        _outReal = (cl_double*) malloc (_fft_size * sizeof (cl_double));
+        _outImag = (cl_double*) malloc (_fft_size * sizeof (cl_double));
     }
     
     // Initialization of _inReal, _inImag, _outReal and _outImag. 
-    for(int i=0; i < _fft_size; i++) {        
+    for(int i = 0; i < _fft_size; i++) {
         _inReal[i]  = (double) rand() / RAND_MAX * _range + _min;
         _inImag[i]  = 0.0f;
         _outReal[i] = 0.0f;
         _outImag[i] = 0.0f;
     }
-}
-
-void dump_fft(string label, vector<double>& data) {
-    
-    cout << label << " size " << data.size() << endl;
-    for (int i = 0; i < 48 ; ++i) {
-        cout << data[i] << endl;
-        if (i % 8 == 0 && i != 0)
-            cout << endl;
-    }
-    cout << endl;
 }
 
 void setup_clFFT(size_t N) {
@@ -125,11 +114,10 @@ void release_clFFT() {
 }
 
 int FftOpenCL() {
-    
+
     // Size of temp buffer. 
     size_t tmpBufferSize = 0;
     int status = 0;
-    int ret = 0;
 
     // Create temporary buffer. 
     status = clfftGetTmpBufSize(_planHandle, &tmpBufferSize);
@@ -142,7 +130,7 @@ int FftOpenCL() {
 
     // Prepare OpenCL memory objects : create buffer for input. 
     _buffersIn[0] = clCreateBuffer(_ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                  _fft_size * sizeof(cl_float), _inReal, &_err);
+                                  _fft_size * sizeof(cl_double), _inReal, &_err);
     if (_err != CL_SUCCESS)
         printf("Error with _buffersIn[0] clCreateBuffer\n");
 
@@ -154,7 +142,7 @@ int FftOpenCL() {
 
     // Prepare OpenCL memory objects : create buffer for input. 
     _buffersIn[1] = clCreateBuffer(_ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                  _fft_size * sizeof(cl_float), _inImag, &_err);
+                                  _fft_size * sizeof(cl_double), _inImag, &_err);
     if (_err != CL_SUCCESS)
         printf("Error with _buffersIn[1] clCreateBuffer\n");
 
@@ -166,12 +154,12 @@ int FftOpenCL() {
 
     // Prepare OpenCL memory objects : create buffer for output. 
     _buffersOut[0] = clCreateBuffer(_ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-                                    _fft_size * sizeof(cl_float), _outReal, &_err);
+                                    _fft_size * sizeof(cl_double), _outReal, &_err);
     if (_err != CL_SUCCESS)
         printf("Error with _buffersOut[0] clCreateBuffer\n");
 
     _buffersOut[1] = clCreateBuffer(_ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-                                    _fft_size * sizeof(cl_float), _outImag, &_err);
+                                    _fft_size * sizeof(cl_double), _outImag, &_err);
     if (_err != CL_SUCCESS)
         printf("Error with _buffersOut[1] clCreateBuffer\n");
 
@@ -193,9 +181,6 @@ int FftOpenCL() {
     
       _err = clEnqueueReadBuffer(_queue, _buffersOut[1], CL_TRUE, 0, _fft_size * sizeof(float), _inImag,
                                 0, NULL, NULL);
-
-    
-    return ret;
 }
 
 void summarize(nanoseconds total_duration) {
