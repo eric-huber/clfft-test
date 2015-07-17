@@ -4,6 +4,7 @@ CXXFLAGS += `pkg-config --cflags opencv`
 CXXFLAGS += -std=c++11
 LDFLAGS  += `pkg-config --libs opencv`
 LDFLAGS  += -lboost_program_options
+LDFLAGS  += -lclFFT -L$(OPENCL)/lib/x86_64 -lm -lOpenCL 
 
 PROG=ffttest
 OBJS=$(PROG).o
