@@ -11,6 +11,12 @@ using namespace chrono;
 
 namespace po = boost::program_options;
 
+#define CHECK(MSG)                        \
+    if (_err != CL_SUCCESS) {             \
+      cerr << MSG << " (" << _err << ")"; \
+      return;                             \
+    }
+
 size_t  _fft_size       = 8192;
 int     _count          = 1000;
 int     _count_per_loop = 1000;
@@ -28,7 +34,6 @@ cl_command_queue        _queue = 0;
 
 // Input and Output buffer.
 cl_mem                  _buffersIn[2]  = {0, 0};
-cl_mem                  _buffersOut[2] = {0, 0};
 
 // Temporary buffer.
 cl_mem                  _tmpBuffer = 0;
@@ -39,20 +44,14 @@ clfftPlanHandle         _planHandle = 0;
 // Data buffer
 cl_double*               _inReal  = 0;
 cl_double*               _inImag  = 0;
-cl_double*               _outReal = 0;
-cl_double*               _outImag = 0;
 
 void allocate_buffers() {
 
     _inReal  = (cl_double*) malloc (_fft_size * sizeof (cl_double));
     _inImag  = (cl_double*) malloc (_fft_size * sizeof (cl_double));
-    _outReal = (cl_double*) malloc (_fft_size * sizeof (cl_double));
-    _outImag = (cl_double*) malloc (_fft_size * sizeof (cl_double));
 
     memset(_inReal, 0, sizeof(_inReal));
     memset(_inImag, 0, sizeof(_inImag));
-    memset(_outReal, 0, sizeof(_outReal));
-    memset(_outImag, 0, sizeof(_outImag));
 
     // Size of temp buffer. 
     size_t tmpBufferSize = 0;
@@ -78,17 +77,6 @@ void allocate_buffers() {
                                   _fft_size * sizeof(cl_double), _inImag, &_err);
     if (_err != CL_SUCCESS)
         printf("Error with _buffersIn[1] clCreateBuffer\n");
-
-    // Prepare OpenCL memory objects : create buffer for output. 
-    _buffersOut[0] = clCreateBuffer(_ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-                                    _fft_size * sizeof(cl_double), _outReal, &_err);
-    if (_err != CL_SUCCESS)
-        printf("Error with _buffersOut[0] clCreateBuffer\n");
-
-    _buffersOut[1] = clCreateBuffer(_ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-                                    _fft_size * sizeof(cl_double), _outImag, &_err);
-    if (_err != CL_SUCCESS)
-        printf("Error with _buffersOut[1] clCreateBuffer\n");
 }
 
 void populate() {
@@ -99,8 +87,6 @@ void populate() {
     for(int i = 0; i < _fft_size; i++) {
         _inReal[i]  = (double) rand() / RAND_MAX * _range + _min;
         _inImag[i]  = 0.0f;
-        _outReal[i] = 0.0f;
-        _outImag[i] = 0.0f;
     }
 }
 
@@ -127,20 +113,28 @@ void setup_clFFT(size_t N) {
     _err = clfftCreateDefaultPlan(&_planHandle, _ctx, dim, clLengths);
     
     // Set plan parameters. 
-    _err = clfftSetPlanPrecision(_planHandle, CLFFT_SINGLE);
+    _err = clfftSetPlanPrecision(_planHandle, CLFFT_DOUBLE);
     _err = clfftSetLayout(_planHandle, CLFFT_COMPLEX_PLANAR, CLFFT_COMPLEX_PLANAR);
-    _err = clfftSetResultLocation(_planHandle, CLFFT_OUTOFPLACE);
+    _err = clfftSetResultLocation(_planHandle, CLFFT_INPLACE);
     
     // Bake the plan. 
     _err = clfftBakePlan(_planHandle, 1, &_queue, NULL, NULL);
+}
+
+void dump_fft(string label) {
+    
+    cout << label << endl;
+    cout.precision(2);
+    for (int i = 0; i < 8; ++i) {
+        cout << i << "    \t" << _inReal[i] << "    \t" << _inImag[i] << endl;
+    }
+    cout << endl;
 }
 
 void release_clFFT() {
     // Release OpenCL memory objects. 
     clReleaseMemObject(_buffersIn[0]);
     clReleaseMemObject(_buffersIn[1]);
-    clReleaseMemObject(_buffersOut[0]);
-    clReleaseMemObject(_buffersOut[1]);
     clReleaseMemObject(_tmpBuffer);
     
     // Release the plan. 
@@ -154,33 +148,36 @@ void release_clFFT() {
     clReleaseContext(_ctx);
 }
 
-inline int perform_fft() {
+inline void perform_fft() {
+
+    cl_event writes[2] = {0};
 
     // Enqueue write tab array into _buffersIn[0]. 
-    _err = clEnqueueWriteBuffer(_queue, _buffersIn[0], CL_TRUE, 0, 
-                                _fft_size * sizeof(float), _inReal, 0, NULL, NULL);
-    if (_err != CL_SUCCESS)
-        printf("Error with _buffersIn[0] clEnqueueWriteBuffer\n");
-
-    // Enqueue write tab array into _buffersIn[1]. 
-    _err = clEnqueueWriteBuffer(_queue, _buffersIn[1], CL_TRUE, 0, _fft_size * sizeof(float),
-                               _inImag, 0, NULL, NULL);
-    if (_err != CL_SUCCESS)
-        printf("Error with _buffersIn[1] clEnqueueWriteBuffer\n");
-
-    // Execute the plan. 
-    _err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 0, NULL, NULL,
-                                 _buffersIn, _buffersOut, _tmpBuffer);
+    _err = clEnqueueWriteBuffer(_queue, _buffersIn[0], CL_FALSE, 0, 
+                                _fft_size * sizeof(double), _inReal, 0, NULL, &writes[0]);
+    CHECK("clEnqueueWriteBuffer real");
     
-    // Wait for calculations to be finished. 
+    _err = clEnqueueWriteBuffer(_queue, _buffersIn[1], CL_TRUE, 0,
+                                _fft_size *sizeof(double), _inImag, 0, NULL, &writes[1]);
+    CHECK("clEnqueueWriteBuffer imag");
+
+    // Execute the plan.
+    cl_event transform;
+    _err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 2, writes, &transform,
+                                 _buffersIn, NULL, _tmpBuffer);
+    CHECK("clEnqueueTransform");
+    
+    // Copy result to input array
+    _err = clEnqueueReadBuffer(_queue, _buffersIn[0], CL_FALSE, 0,
+                               _fft_size * sizeof(double), _inReal, 1, &transform, NULL);
+    CHECK("clEnqueueReadBuffer real");
+    
+    _err = clEnqueueReadBuffer(_queue, _buffersIn[1], CL_FALSE, 0, 
+                               _fft_size * sizeof(double), _inImag, 1, &transform, NULL);
+    CHECK("clEnqueueReadBuffer imag");
+    
     _err = clFinish(_queue);
-    
-    // Fetch results of calculations : Real and Imaginary. 
-    _err = clEnqueueReadBuffer(_queue, _buffersOut[0], CL_TRUE, 0, _fft_size * sizeof(float), _inReal,
-                               0, NULL, NULL);
-    
-    _err = clEnqueueReadBuffer(_queue, _buffersOut[1], CL_TRUE, 0, _fft_size * sizeof(float), _inImag,
-                               0, NULL, NULL);
+    CHECK("clFinish");
 }
 
 void summarize(nanoseconds total_duration) {
@@ -189,7 +186,7 @@ void summarize(nanoseconds total_duration) {
     double ave = total_duration.count() / count;
 
     cout.precision(8);
-    cout << "\r100 % " << endl;
+    cerr << "\r100 %     " << endl;
     cout << endl;
     cout << "Iterations: " << _count << endl;
     cout << "Per loop:   " << _count_per_loop << endl;
@@ -228,10 +225,16 @@ void time_fft() {
         
         // tell user
         double percent = 100.0 * ((i+1) * _count_per_loop) / (_count * _count_per_loop);
-        cout.precision(2);
-        cout << "\r" << percent << " %    ";
-        cout.flush();
+        cerr.precision(2);
+        cerr << "\r" << percent << " %    ";
+        cerr.flush();
     }
+    
+    // example
+    populate();
+    dump_fft("Before...");
+    perform_fft();
+    dump_fft("After...");
     
     release_clFFT();    
 
