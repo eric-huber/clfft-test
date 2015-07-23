@@ -7,7 +7,9 @@ LDFLAGS  += -lboost_program_options
 LDFLAGS  += -lclFFT -L$(OPENCL)/lib/x86_64 -lm -lOpenCL 
 
 PROG=ffttest
-OBJS=$(PROG).o
+OBJS=fft.o \
+     fftdata.o \
+     main.o
 
 .PHONY: all clean
 $(PROG): $(OBJS)
