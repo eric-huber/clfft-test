@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 
 #include "fft.hh"
 
@@ -35,24 +36,23 @@ void Fft::shutdown() {
 bool Fft::add(FftData& data) {
     cl_int err = 0;
    
-    size_t   size       = _fft_size * sizeof(cl_float);
     cl_event writes[2]  = {0};
-    cl_event transform;
+    cl_event transform = 0;
 
     // Enqueue write tab array into _local_buffers[0]. 
     err = clEnqueueWriteBuffer(_copy_queue, data._local_buffers[FftData::REAL], CL_FALSE, 0, 
                                 data.buffer_size(), data._real, 0, NULL, &writes[0]);
     CHECK("clEnqueueWriteBuffer real");
     
-    err = clEnqueueWriteBuffer(_copy_queue, data._local_buffers[FftData::IMAG], CL_TRUE, 0,
+    err = clEnqueueWriteBuffer(_copy_queue, data._local_buffers[FftData::IMAG], CL_FALSE, 0,
                                 data.buffer_size(), data._imag, 0, NULL, &writes[1]);
     CHECK("clEnqueueWriteBuffer imag");
 
     // Enqueue the FFT
     err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_fft_queue, 2, writes, &transform,
-                                 data._local_buffers, NULL, NULL);//_tmpBuffer);
+                                 data._local_buffers, NULL, NULL);
     CHECK("clEnqueueTransform");
-    
+        
     // Copy result to input array
     err = clEnqueueReadBuffer(_copy_queue, data._local_buffers[FftData::REAL], CL_FALSE, 0,
                                data.buffer_size(), data._real, 1, &transform, &data._wait_list[FftData::REAL]);
@@ -72,15 +72,13 @@ bool Fft::setupCl() {
     err = clGetPlatformIDs(1, &_platform, NULL);
     CHECK("clGetPlatformIds");
 
-    cl_uint num_devices = 0;
-    
     // Setup devices
-    err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_GPU, 1, &_device, &num_devices);
+    err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_GPU, 1, &_device, NULL);
     CHECK("clGetDeviceIds GPU");
-    std::cout << "Num GPU devices: " << num_devices << std::endl;
 
     // Setup context
-    _context = clCreateContext(0, 1, &_device, NULL, NULL, &err);
+    cl_context_properties props[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) _platform, 0};
+    _context = clCreateContext(props, 1, &_device, NULL, NULL, &err);
     CHECK("clCreateContext");
 
     // Setup queues

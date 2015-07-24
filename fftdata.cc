@@ -35,11 +35,6 @@ FftData::~FftData() {
         clReleaseMemObject(_local_buffers[IMAG]);
 }
 
-void FftData::get(cl_float* real, cl_float* imag) {
-    memcpy(_real, _local_buffers[REAL], buffer_size());
-    memcpy(_imag, _local_buffers[IMAG], buffer_size());
-}
-
 void FftData::set(cl_float* real, cl_float* imag) {
     _real = real;
     _imag = imag;

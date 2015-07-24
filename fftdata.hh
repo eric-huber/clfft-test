@@ -13,7 +13,6 @@ public:
     FftData(Fft& fft);
     ~FftData();
 
-    void       get(cl_float* real, cl_float* imag);
     void       set(cl_float* real, cl_float* imag);
     void       wait();
 
