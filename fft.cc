@@ -42,11 +42,11 @@ bool Fft::add(FftData& data) {
     cl_event transform = 0;
 
     // Enqueue write tab array into _local_buffers[0]. 
-    err = clEnqueueWriteBuffer(_queue, data.in_real(), CL_TRUE, 0, 
+    err = clEnqueueWriteBuffer(_queue, data.in_real(), CL_FALSE, 0, 
                                 data.buffer_size(), data._real, 0, NULL, &writes[0]);
     CHECK("clEnqueueWriteBuffer real");
     
-    err = clEnqueueWriteBuffer(_queue, data.in_imag(), CL_TRUE, 0,
+    err = clEnqueueWriteBuffer(_queue, data.in_imag(), CL_FALSE, 0,
                                 data.buffer_size(), data._imag, 0, NULL, &writes[1]);
     CHECK("clEnqueueWriteBuffer imag");
 
@@ -56,11 +56,11 @@ bool Fft::add(FftData& data) {
     CHECK("clEnqueueTransform");
     
     // Copy result to input array
-    err = clEnqueueReadBuffer(_queue, data.out_real(), CL_TRUE, 0,
+    err = clEnqueueReadBuffer(_queue, data.out_real(), CL_FALSE, 0,
                                data.buffer_size(), data._real, 1, &transform, &reads[0]);
     CHECK("clEnqueueReadBuffer real");
     
-    err = clEnqueueReadBuffer(_queue, data.out_imag(), CL_TRUE, 0, 
+    err = clEnqueueReadBuffer(_queue, data.out_imag(), CL_FALSE, 0, 
                                data.buffer_size(), data._imag, 1, &transform, &reads[1]);
     CHECK("clEnqueueReadBuffer imag");
 

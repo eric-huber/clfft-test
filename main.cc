@@ -3,18 +3,20 @@
 #include <clFFT.h>
 
 #include <cstdlib>
+#include <chrono>
 #include <iostream>
 #include <iomanip>
  
 #include "fft.hh"
 
 using namespace std;
+using namespace chrono;
 
 namespace po = boost::program_options;
 
 void dump(std::string label, size_t size, cl_float* real, cl_float* imag) {
 
-    std::cout << label << std::endl;
+    cout << label << endl;
     
     for (int i = 0; i < 32; i = i + 4) {
         for (int j = 0; j < 4; ++j) { 
@@ -27,7 +29,7 @@ void dump(std::string label, size_t size, cl_float* real, cl_float* imag) {
     }
 }
 
-void test_fft(size_t size, int count, double range, double min) {
+void test_fft(size_t size, int count, int loop, double range, double min) {
 
     Fft fft(size);
     if (!fft.init()) {
@@ -40,34 +42,74 @@ void test_fft(size_t size, int count, double range, double min) {
     cl_float* imag  = (cl_float*) malloc (size * sizeof (cl_float));
 
     srand(time(NULL));
-    
-    // Initialization of _real, _imag, _outReal and _outImag. 
-    for(int i = 0; i < size; i++) {
-        real[i]  = (float) rand() / RAND_MAX * range + min;
-        imag[i]  = 0.0f;
-    }
 
-    dump("Init:", size, real, imag);
+    nanoseconds total_duration(0);
 
-    // init data object
     FftData data(fft);
-    data.set(real, imag);
 
-    // perform fft
-    fft.add(data);
+    for (int outer = 0; outer < count; ++outer) {
+        
+        // Initialization of _real, _imag, _outReal and _outImag. 
+        for(int i = 0; i < size; i++) {
+            real[i]  = (float) rand() / RAND_MAX * range + min;
+            imag[i]  = 0.0f;
+        }
 
-    // wait for completion
-    data.wait();
-
-    dump("Final:", size, real, imag);
+        // init data object
+        data.set(real, imag);
     
-    fft.shutdown();    
+        int loops = 0;
+        do {
+            // start timer
+            high_resolution_clock::time_point start = high_resolution_clock::now();
+        
+            // perform fft
+            fft.add(data);
+        
+            // wait for completion
+            data.wait();
+
+            // end timer            
+            high_resolution_clock::time_point finish = high_resolution_clock::now();
+
+            auto duration = finish - start;
+            total_duration += duration_cast<nanoseconds>(duration);
+            
+            ++loops;
+            
+        } while (loops < loop);
+        
+       if (outer % 10 == 0) {
+            double percent = ((double) outer / (double) count * loop * 100.0);
+            cerr << "\r" << percent << " %    ";
+            cerr.flush();
+        }
+
+    }
+    
+    fft.shutdown();
+    
+    // report time
+    double ave = total_duration.count() / (count * loop);
+
+    cout.precision(8);
+    cerr << "\r100 % " << endl;
+    cout << endl;
+    cout << "Iterations: " << count << endl;
+    cout << "Per loop:   " << loop << endl;
+    cout << "Data size:  " << size << endl;
+    cout << "Range:      " << range << endl;
+    cout << "Min:        " << min << endl;
+    cout << endl;
+    cout << "Time:       " << total_duration.count() << " ns" << endl;
+    cout << "Average:    " << ave << " ns (" << (ave / 1000.0) << " μs)" << endl;  
 }
 
 int main(int ac, char* av[]) {
 
     size_t  fft_size    = 8192;
     int     count       = 1000;
+    int     loop        = 1000;
     double  range       = 25.0;
     double  min         = 0.0;
 
@@ -96,6 +138,10 @@ int main(int ac, char* av[]) {
         if (vm.count("count")) {
             count = vm["count"].as<int>();
         }
+        
+        if (vm.count("loop")) {
+            loop = vm["loop"].as<int>();
+        }
 
         if (vm.count("size")) {
             fft_size = vm["size"].as<int>();
@@ -117,7 +163,7 @@ int main(int ac, char* av[]) {
         return 1;
     }
 
-    test_fft(fft_size, count, range, min);
+    test_fft(fft_size, count, loop, range, min);
     
     return 0;
 }
