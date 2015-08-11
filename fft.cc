@@ -3,10 +3,12 @@
 
 #include "fft.hh"
 
-#define CHECK(MSG)                                          \
-    if (err != CL_SUCCESS) {                                \
-      std::cerr << __FILE__ << ":" << __LINE__ << " Unexpected result for " << MSG << " (" << err << ")" << std::endl;  \
-      return false;                                         \
+#define CHECK(MSG)                              \
+    if (err != CL_SUCCESS) {                    \
+      std::cerr << __FILE__ << ":" << __LINE__  \
+          << " Unexpected result for " << MSG   \
+          << " (" << err << ")" << std::endl;   \
+      return false;                             \
     }
 
 
@@ -28,8 +30,7 @@ void Fft::shutdown() {
     clfftTeardown();
     
     // Release OpenCL working objects. 
-    clReleaseCommandQueue(_copy_queue);
-    clReleaseCommandQueue(_fft_queue);
+    clReleaseCommandQueue(_queue);
     clReleaseContext(_context);
 }
 
@@ -37,32 +38,41 @@ bool Fft::add(FftData& data) {
     cl_int err = 0;
    
     cl_event writes[2]  = {0};
+    cl_event reads[2] = {0};
     cl_event transform = 0;
 
     // Enqueue write tab array into _local_buffers[0]. 
-    err = clEnqueueWriteBuffer(_copy_queue, data._local_buffers[FftData::REAL], CL_FALSE, 0, 
+    err = clEnqueueWriteBuffer(_queue, data.in_real(), CL_TRUE, 0, 
                                 data.buffer_size(), data._real, 0, NULL, &writes[0]);
     CHECK("clEnqueueWriteBuffer real");
     
-    err = clEnqueueWriteBuffer(_copy_queue, data._local_buffers[FftData::IMAG], CL_FALSE, 0,
+    err = clEnqueueWriteBuffer(_queue, data.in_imag(), CL_TRUE, 0,
                                 data.buffer_size(), data._imag, 0, NULL, &writes[1]);
     CHECK("clEnqueueWriteBuffer imag");
 
     // Enqueue the FFT
-    err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_fft_queue, 2, writes, &transform,
-                                 data._local_buffers, NULL, NULL);
+    err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 2, writes, &transform,
+                                 data.in_buffers(), data.out_buffers(), data.temp_buffer());
     CHECK("clEnqueueTransform");
-        
+    
     // Copy result to input array
-    err = clEnqueueReadBuffer(_copy_queue, data._local_buffers[FftData::REAL], CL_FALSE, 0,
-                               data.buffer_size(), data._real, 1, &transform, &data._wait_list[FftData::REAL]);
+    err = clEnqueueReadBuffer(_queue, data.out_real(), CL_TRUE, 0,
+                               data.buffer_size(), data._real, 1, &transform, &reads[0]);
     CHECK("clEnqueueReadBuffer real");
     
-    err = clEnqueueReadBuffer(_copy_queue, data._local_buffers[FftData::IMAG], CL_FALSE, 0, 
-                               data.buffer_size(), data._imag, 1, &transform, &data._wait_list[FftData::IMAG]);
+    err = clEnqueueReadBuffer(_queue, data.out_imag(), CL_TRUE, 0, 
+                               data.buffer_size(), data._imag, 1, &transform, &reads[1]);
     CHECK("clEnqueueReadBuffer imag");
 
+    data.set_wait(reads);
+
     return true;
+}
+
+size_t Fft::getTempBufferSize() {
+    size_t size = 0;
+    int status = clfftGetTmpBufSize(_planHandle, &size);
+    return 0 == status ? size : 0;
 }
 
 bool Fft::setupCl() {
@@ -82,11 +92,8 @@ bool Fft::setupCl() {
     CHECK("clCreateContext");
 
     // Setup queues
-    _copy_queue = clCreateCommandQueue(_context, _device, 0 /* IN-ORDER */, &err);
+    _queue = clCreateCommandQueue(_context, _device, 0 /* IN-ORDER */, &err);
     CHECK("clCreateCommandQueue CPU");
-       
-    _fft_queue = clCreateCommandQueue(_context, _device, 0 /* IN-ORDER */, &err);
-    CHECK("clCreateCommandQueue GPU");
 
     return true;
 }
@@ -114,11 +121,11 @@ bool Fft::setupClFft() {
     CHECK("clfftSetPlanPrecision");
     err = clfftSetLayout(_planHandle, CLFFT_COMPLEX_PLANAR, CLFFT_COMPLEX_PLANAR);
     CHECK("clfftSetLayout");
-    err = clfftSetResultLocation(_planHandle, CLFFT_INPLACE);
+    err = clfftSetResultLocation(_planHandle, CLFFT_OUTOFPLACE);
     CHECK("clfftSetResultLocation");
 
-    // Bake the plan. 
-    err = clfftBakePlan(_planHandle, 1, &_fft_queue, NULL, NULL);
+    // Bake the plan
+    err = clfftBakePlan(_planHandle, 1, &_queue, NULL, NULL);
     CHECK("clfftBakePlan");
 
     return true;

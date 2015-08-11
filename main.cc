@@ -1,6 +1,6 @@
 #include <boost/program_options.hpp>
 
-#include <clFFT/clFFT.h>
+#include <clFFT.h>
 
 #include <cstdlib>
 #include <iostream>

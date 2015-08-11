@@ -1,7 +1,7 @@
 #ifndef __fft_h
 #define __fft_h
 
-#include <clFFT/clFFT.h>
+#include <clFFT.h>
 #include <vector>
 
 #include "fftdata.hh"
@@ -21,6 +21,7 @@ public:
 
 public:
     cl_context get_context() { return _context; }
+    size_t     getTempBufferSize();
 
 private:
     bool setupCl();
@@ -32,9 +33,8 @@ private:
     cl_platform_id      _platform;
     cl_device_id        _device;
     cl_context          _context;
-    cl_command_queue    _copy_queue;
-    cl_command_queue    _fft_queue;
-
+    cl_command_queue    _queue;
+\
     clfftPlanHandle     _planHandle;
 };
 
