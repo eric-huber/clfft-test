@@ -14,7 +14,7 @@ using namespace chrono;
 
 namespace po = boost::program_options;
 
-void test_fft(size_t size, int count, int loop, double range, double min) {
+void test_fft(size_t size, long count, double range, double min) {
 
     Fft fft(size);
     if (!fft.init()) {
@@ -41,7 +41,9 @@ void test_fft(size_t size, int count, int loop, double range, double min) {
     fft.shutdown();
 }
 
-void time_fft(size_t size, int count, int loop, double range, double min) {
+void time_fft(size_t size, long count, double range, double min) {
+
+    cout << "Timing..." << endl;
 
     Fft fft(size);
     if (!fft.init()) {
@@ -49,43 +51,53 @@ void time_fft(size_t size, int count, int loop, double range, double min) {
         return;
     }
 
-    nanoseconds total_duration;
+    vector<FftJob> jobs;
 
-    for (int outer = 0; outer < count; ++outer) {
+    nanoseconds total_duration(0);
+
+    for (int outer = 0; outer < count; outer += 16) {
+        
+        // randomize data 
+        for (auto job : jobs) {
+            job.randomize(range, min);
+        }
         
         // start timer
         high_resolution_clock::time_point start = high_resolution_clock::now();
     
-        // perform fft
-        //fft.add(*datum);
+        // queue ffts
+        for (auto job : jobs) {
+            fft.add(job);
+        }
     
         // wait for completion
-        // ???
+        fft.wait_all();
 
         // end timer            
         high_resolution_clock::time_point finish = high_resolution_clock::now();
 
+        // compute time
         auto duration = finish - start;
         total_duration += duration_cast<nanoseconds>(duration);
-                
-        if (outer % 10 == 0) {
-            double percent = ((double) outer / (double) count * loop * 100.0);
+
+        // update user
+        if (outer % 64 == 0) {                
+            int percent = (int) round((double) outer / (double) count * 100.0);
             cerr << "\r" << percent << " %    ";
             cerr.flush();
         }
-
     }
     
     fft.shutdown();
     
     // report time
-    double ave = total_duration.count() / (count * loop);
+    double ave = total_duration.count() / count;
 
     cout.precision(8);
     cerr << "\r100 % " << endl;
     cout << endl;
     cout << "Iterations: " << count << endl;
-    cout << "Per loop:   " << loop << endl;
+    //cout << "Per loop:   " << loop << endl;
     cout << "Data size:  " << size << endl;
     cout << "Range:      " << range << endl;
     cout << "Min:        " << min << endl;
@@ -97,8 +109,7 @@ void time_fft(size_t size, int count, int loop, double range, double min) {
 int main(int ac, char* av[]) {
 
     size_t  fft_size    = 8192;
-    int     count       = 1000;
-    int     loop        = 1000;
+    long    count       = 1e6;
     double  range       = 25.0;
     double  min         = 0.0;
 
@@ -108,8 +119,7 @@ int main(int ac, char* av[]) {
     
         desc.add_options()
         ("help,h",   "produce help message")
-        ("count,c",  po::value<int>(), "set the number of timed loops to perform")
-        ("loop,l",   po::value<int>(), "Set the number of FFT interations per loop")
+        ("count,c",  po::value<long>(), "set the number of timed loops to perform")
         ("size,s",   po::value<int>(), "Set the size of the buffer buffer [8192]")
         ("range,r",  po::value<double>(), "Set the range of the random buffer [25.0]")
         ("min,m",    po::value<double>(), "Set the minimum value of the random buffer [0.0]")
@@ -125,11 +135,7 @@ int main(int ac, char* av[]) {
         }
 
         if (vm.count("count")) {
-            count = vm["count"].as<int>();
-        }
-        
-        if (vm.count("loop")) {
-            loop = vm["loop"].as<int>();
+            count = vm["count"].as<long>();
         }
 
         if (vm.count("size")) {
@@ -152,8 +158,12 @@ int main(int ac, char* av[]) {
         return 1;
     }
 
-    test_fft(fft_size, count, loop, range, min);
-    //time_fft(fft_size, count, loop, range, min);
+    // to nearest 16
+    count = ((int) ceil(count / 16.0) + 1) * 16;
+
+    test_fft(fft_size, count, range, min);
+    
+    time_fft(fft_size, count, range, min);
     
     return 0;
 }
