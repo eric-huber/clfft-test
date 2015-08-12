@@ -53,6 +53,9 @@ bool Fft::add(FftJob& job) {
 
     // get buffer (may block)
     FftBuffer* buffer = get_buffer();
+    // temp - no buffer? return false
+    if (NULL == buffer)
+        return NULL;
     buffer->set_job(&job);
 
     // Enqueue write tab array into _local_buffers[0]. 

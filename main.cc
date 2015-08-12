@@ -49,66 +49,32 @@ void time_fft(size_t size, int count, int loop, double range, double min) {
         return;
     }
 
-    // allocate buffers    
-    cl_float* real  = (cl_float*) malloc (size * sizeof (cl_float));
-    cl_float* imag  = (cl_float*) malloc (size * sizeof (cl_float));
-
-    srand(time(NULL));
-
-    nanoseconds total_duration(0);
-
-    vector<FftBuffer*> buffer;
-    for (int i = 0; i < 10; ++i) {
-        buffer.push_back(new FftBuffer(fft));
-    }
-
     for (int outer = 0; outer < count; ++outer) {
         
-        // Initialization of _real, _imag, _outReal and _outImag. 
-        for(int i = 0; i < size; i++) {
-            real[i]  = (float) rand() / RAND_MAX * range + min;
-            imag[i]  = 0.0f;
-        }
-
-        // init buffer object
-        for (auto datum : buffer) {
-            //datum->set(real, imag);
-        }
+        // start timer
+        high_resolution_clock::time_point start = high_resolution_clock::now();
     
-        int loops = 0;
-        do {
-            // start timer
-            high_resolution_clock::time_point start = high_resolution_clock::now();
-        
-            for (auto datum : buffer) {
-                // perform fft
-                //fft.add(*datum);
-            }
-            cout << "buffer added" << endl;
-        
-            // wait for completion
-            // ???
+        for (auto datum : buffer) {
+            // perform fft
+            //fft.add(*datum);
+        }
+        cout << "buffer added" << endl;
+    
+        // wait for completion
+        // ???
 
-            // end timer            
-            high_resolution_clock::time_point finish = high_resolution_clock::now();
+        // end timer            
+        high_resolution_clock::time_point finish = high_resolution_clock::now();
 
-            auto duration = finish - start;
-            total_duration += duration_cast<nanoseconds>(duration);
-            
-            loops += 10;
-            
-        } while (loops < loop);
-        
+        auto duration = finish - start;
+        total_duration += duration_cast<nanoseconds>(duration);
+                
         if (outer % 10 == 0) {
             double percent = ((double) outer / (double) count * loop * 100.0);
             cerr << "\r" << percent << " %    ";
             cerr.flush();
         }
 
-    }
-    
-    for (auto datum : buffer) {
-        datum->release();
     }
     
     fft.shutdown();
