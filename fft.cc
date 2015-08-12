@@ -3,6 +3,8 @@
 
 #include "fft.hh"
 
+#define BUFFERS     16
+
 #define CHECK(MSG)                              \
     if (err != CL_SUCCESS) {                    \
       std::cerr << __FILE__ << ":" << __LINE__  \
@@ -13,22 +15,26 @@
 
 
 Fft::Fft(size_t fft_size)
-  : _fft_size(fft_size),
-    _buffer(NULL)
+  : _fft_size(fft_size)
 {
 }
 
 bool Fft::init() {
 
-    if (setupCl() && setupClFft())
+    if (setup_cl() && setup_clFft() && setup_buffers())
         return true;
     return false;
 }
 
 void Fft::shutdown() {
     
-    if (NULL != _buffer)
-        _buffer->release();
+    if (_buffers.empty()) {
+        for (int i = BUFFERS-1; 0 <= i; --i) {
+            _buffers.at(i)->release();
+            _buffers.pop_back();
+        }
+        
+    }
     
     // Release clFFT library. 
     clfftTeardown();
@@ -78,16 +84,19 @@ bool Fft::add(FftJob& job) {
 }
 
 void Fft::wait_all() {
-    _buffer->wait();
+    for (auto buffer : _buffers) {
+        if (buffer->in_use())
+            buffer->wait();
+    }
 }
 
-size_t Fft::getTempBufferSize() {
+size_t Fft::get_temp_buffer_size() {
     size_t size = 0;
     int status = clfftGetTmpBufSize(_planHandle, &size);
     return 0 == status ? size : 0;
 }
 
-bool Fft::setupCl() {
+bool Fft::setup_cl() {
     cl_int err = 0;
 
     // Setup platform 
@@ -110,7 +119,7 @@ bool Fft::setupCl() {
     return true;
 }
 
-bool Fft::setupClFft() {
+bool Fft::setup_clFft() {
     cl_int err = 0;
 
     // Setup clFFT. 
@@ -143,9 +152,20 @@ bool Fft::setupClFft() {
     return true;
 }
 
+bool Fft::setup_buffers() {
+    for (int i = 0; i < BUFFERS; ++i) {
+        _buffers.push_back(new FftBuffer(*this));
+    }
+}
+
 FftBuffer* Fft::get_buffer() {
-    if (NULL == _buffer)
-        _buffer = new FftBuffer(*this);
-        
-    return _buffer;
+    
+    for (auto buffer : _buffers) {
+        if (buffer->in_use())
+            continue;
+        buffer->set_in_use(true);
+        return buffer;
+    }
+    
+    return NULL;
 }

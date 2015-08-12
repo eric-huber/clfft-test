@@ -22,25 +22,25 @@ public:
 
 public:
     cl_context  get_context() { return _context; }
-    size_t      getTempBufferSize();
+    size_t      get_temp_buffer_size();
 
 private:
-    bool setupCl();
-    bool setupClFft();
+    bool setup_cl();
+    bool setup_clFft();
+    bool setup_buffers();
 
     FftBuffer*  get_buffer();
 
 private:
-    size_t              _fft_size;
+    size_t                  _fft_size;
 
-    cl_platform_id      _platform;
-    cl_device_id        _device;
-    cl_context          _context;
-    cl_command_queue    _queue;
-    clfftPlanHandle     _planHandle;
+    cl_platform_id          _platform;
+    cl_device_id            _device;
+    cl_context              _context;
+    cl_command_queue        _queue;
+    clfftPlanHandle         _planHandle;
     
-    // TEMP 
-    FftBuffer*          _buffer;
+    std::vector<FftBuffer*> _buffers;
 };
 
 #endif // __fft_h

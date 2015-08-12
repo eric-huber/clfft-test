@@ -15,7 +15,8 @@ FftBuffer::FftBuffer(Fft& fft)
   : _fft(fft),
     _job(NULL),
     _temp_buf(0),
-    _wait_list{0}
+    _wait_list{0},
+    _in_use(false)
 {
     cl_int err = 0;
 
@@ -38,7 +39,7 @@ FftBuffer::FftBuffer(Fft& fft)
     CHECK("clCreateBuffer out IMAG");
 
     // allocate temp buffer
-    size_t temp_size = fft.getTempBufferSize();
+    size_t temp_size = fft.get_temp_buffer_size();
     if (0 != temp_size) {
         _temp_buf = clCreateBuffer(fft.get_context(), CL_MEM_READ_WRITE, temp_size, 0, &err);
         CHECK("clCreateBuffer temp");
@@ -76,6 +77,7 @@ void FftBuffer::release() {
 void FftBuffer::wait() {
     cl_int err = clWaitForEvents(2, _wait_list);
     CHECK("clWaitForEvents");
+    _in_use = false;
 }
 
 void dump_status(cl_int status) {

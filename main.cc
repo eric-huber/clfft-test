@@ -29,10 +29,9 @@ void test_fft(size_t size, int count, int loop, double range, double min) {
 
     // perform fft
     fft.add(job);
-    fft.wait_all();
 
     // wait for completion
-    //buffer.wait();
+    fft.wait_all();
 
     //buffer.is_finished();
 

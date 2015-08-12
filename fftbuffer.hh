@@ -13,8 +13,8 @@ public:
     FftBuffer(Fft& fft);
     ~FftBuffer();
 
-    void        set_job(FftJob* job) { _job = job; }
-    FftJob*     get_job() { return _job; }
+    void        set_job(FftJob* job)        { _job = job; }
+    FftJob*     get_job()                   { return _job; }
 
     void        wait();
     bool        is_finished();
@@ -22,6 +22,9 @@ public:
     void        release();
 
     size_t      get_fft_size();
+
+    bool        in_use()                    { return _in_use; }
+    void        set_in_use(bool in_use)     { _in_use = in_use; }
 
 private:
     size_t      buffer_size();
@@ -56,6 +59,8 @@ private:
     cl_mem      _temp_buf;
     
     cl_event    _wait_list[2];
+    
+    bool        _in_use;
 };
 
 #endif // __FftBuffer_hh
