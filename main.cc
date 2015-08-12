@@ -54,6 +54,7 @@ void time_fft(size_t size, long count, double range, double min) {
     vector<FftJob> jobs;
 
     nanoseconds total_duration(0);
+    int last_percent = -1;
 
     for (int outer = 0; outer < count; outer += 16) {
         
@@ -81,10 +82,11 @@ void time_fft(size_t size, long count, double range, double min) {
         total_duration += duration_cast<nanoseconds>(duration);
 
         // update user
-        if (outer % 64 == 0) {                
-            int percent = (int) round((double) outer / (double) count * 100.0);
-            cerr << "\r" << percent << " %    ";
+        int percent = (int) round((double) outer / (double) count * 100.0);
+        if (percent != last_percent) {
+            cerr << "\r" << percent << " %";
             cerr.flush();
+            last_percent = percent;
         }
     }
     
@@ -94,7 +96,7 @@ void time_fft(size_t size, long count, double range, double min) {
     double ave = total_duration.count() / count;
 
     cout.precision(8);
-    cerr << "\r100 % " << endl;
+    cerr << "\r100 %" << endl;
     cout << endl;
     cout << "Iterations: " << count << endl;
     //cout << "Per loop:   " << loop << endl;
@@ -109,7 +111,7 @@ void time_fft(size_t size, long count, double range, double min) {
 int main(int ac, char* av[]) {
 
     size_t  fft_size    = 8192;
-    long    count       = 1e6;
+    long    count       = 1e9;
     double  range       = 25.0;
     double  min         = 0.0;
 
