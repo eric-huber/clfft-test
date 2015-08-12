@@ -14,22 +14,35 @@ using namespace chrono;
 
 namespace po = boost::program_options;
 
-void dump(std::string label, size_t size, cl_float* real, cl_float* imag) {
+void test_fft(size_t size, int count, int loop, double range, double min) {
 
-    cout << label << endl;
-    
-    for (int i = 0; i < 32; i = i + 4) {
-        for (int j = 0; j < 4; ++j) { 
-            std::cout << std::setw(5) << std::setprecision(1) << std::fixed << std::setfill(' ') << real[i + j] << "  ";
-            std::cout << std::setw(5) << std::setprecision(1) << std::fixed << std::setfill(' ') << imag[i + j];
-            if (3 != j)
-                std::cout << "    ";
-        }
-        std::cout << std::endl;
+    Fft fft(size);
+    if (!fft.init()) {
+        fft.shutdown();
+        return;
     }
+    
+    FftJob job(size);
+    job.randomize(range, min);
+
+    job.dump("Initial random buffer");
+
+    // perform fft
+    fft.add(job);
+    fft.wait_all();
+
+    // wait for completion
+    //buffer.wait();
+
+    //buffer.is_finished();
+
+    job.dump("FFT");
+
+    // cleanup
+    fft.shutdown();
 }
 
-void test_fft(size_t size, int count, int loop, double range, double min) {
+void time_fft(size_t size, int count, int loop, double range, double min) {
 
     Fft fft(size);
     if (!fft.init()) {
@@ -45,7 +58,10 @@ void test_fft(size_t size, int count, int loop, double range, double min) {
 
     nanoseconds total_duration(0);
 
-    FftData data(fft);
+    vector<FftBuffer*> buffer;
+    for (int i = 0; i < 10; ++i) {
+        buffer.push_back(new FftBuffer(fft));
+    }
 
     for (int outer = 0; outer < count; ++outer) {
         
@@ -55,19 +71,24 @@ void test_fft(size_t size, int count, int loop, double range, double min) {
             imag[i]  = 0.0f;
         }
 
-        // init data object
-        data.set(real, imag);
+        // init buffer object
+        for (auto datum : buffer) {
+            //datum->set(real, imag);
+        }
     
         int loops = 0;
         do {
             // start timer
             high_resolution_clock::time_point start = high_resolution_clock::now();
         
-            // perform fft
-            fft.add(data);
+            for (auto datum : buffer) {
+                // perform fft
+                //fft.add(*datum);
+            }
+            cout << "buffer added" << endl;
         
             // wait for completion
-            data.wait();
+            // ???
 
             // end timer            
             high_resolution_clock::time_point finish = high_resolution_clock::now();
@@ -75,16 +96,20 @@ void test_fft(size_t size, int count, int loop, double range, double min) {
             auto duration = finish - start;
             total_duration += duration_cast<nanoseconds>(duration);
             
-            ++loops;
+            loops += 10;
             
         } while (loops < loop);
         
-       if (outer % 10 == 0) {
+        if (outer % 10 == 0) {
             double percent = ((double) outer / (double) count * loop * 100.0);
             cerr << "\r" << percent << " %    ";
             cerr.flush();
         }
 
+    }
+    
+    for (auto datum : buffer) {
+        datum->release();
     }
     
     fft.shutdown();
@@ -121,10 +146,10 @@ int main(int ac, char* av[]) {
         ("help,h",   "produce help message")
         ("count,c",  po::value<int>(), "set the number of timed loops to perform")
         ("loop,l",   po::value<int>(), "Set the number of FFT interations per loop")
-        ("size,s",   po::value<int>(), "Set the size of the data buffer [8192]")
-        ("range,r",  po::value<double>(), "Set the range of the random data [25.0]")
-        ("min,m",    po::value<double>(), "Set the minimum value of the random data [0.0]")
-        ("invert,i", "Perform an FFT, then an inverse FFT on the same data");
+        ("size,s",   po::value<int>(), "Set the size of the buffer buffer [8192]")
+        ("range,r",  po::value<double>(), "Set the range of the random buffer [25.0]")
+        ("min,m",    po::value<double>(), "Set the minimum value of the random buffer [0.0]")
+        ("invert,i", "Perform an FFT, then an inverse FFT on the same buffer");
 
         po::variables_map vm;
         po::store(po::parse_command_line(ac, av, desc), vm);
@@ -164,6 +189,7 @@ int main(int ac, char* av[]) {
     }
 
     test_fft(fft_size, count, loop, range, min);
+    //time_fft(fft_size, count, loop, range, min);
     
     return 0;
 }

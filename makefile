@@ -7,7 +7,8 @@ LDFLAGS  += -lclFFT -L/opt/intel/opencl -lm -lOpenCL
 
 PROG=ffttest
 OBJS=fft.o \
-     fftdata.o \
+     fftjob.o \
+     fftbuffer.o \
      main.o
 
 .PHONY: all clean

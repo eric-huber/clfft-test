@@ -13,7 +13,8 @@
 
 
 Fft::Fft(size_t fft_size)
-  : _fft_size(fft_size)
+  : _fft_size(fft_size),
+    _buffer(NULL)
 {
 }
 
@@ -26,6 +27,9 @@ bool Fft::init() {
 
 void Fft::shutdown() {
     
+    if (NULL != _buffer)
+        _buffer->release();
+    
     // Release clFFT library. 
     clfftTeardown();
     
@@ -34,39 +38,47 @@ void Fft::shutdown() {
     clReleaseContext(_context);
 }
 
-bool Fft::add(FftData& data) {
+bool Fft::add(FftJob& job) {
     cl_int err = 0;
    
     cl_event writes[2]  = {0};
     cl_event reads[2] = {0};
     cl_event transform = 0;
 
+    // get buffer (may block)
+    FftBuffer* buffer = get_buffer();
+    buffer->set_job(&job);
+
     // Enqueue write tab array into _local_buffers[0]. 
-    err = clEnqueueWriteBuffer(_queue, data.in_real(), CL_FALSE, 0, 
-                                data.buffer_size(), data._real, 0, NULL, &writes[0]);
+    err = clEnqueueWriteBuffer(_queue, buffer->in_real(), CL_FALSE, 0, 
+                                buffer->buffer_size(), buffer->data_real(), 0, NULL, &writes[0]);
     CHECK("clEnqueueWriteBuffer real");
     
-    err = clEnqueueWriteBuffer(_queue, data.in_imag(), CL_FALSE, 0,
-                                data.buffer_size(), data._imag, 0, NULL, &writes[1]);
+    err = clEnqueueWriteBuffer(_queue, buffer->in_imag(), CL_FALSE, 0,
+                                buffer->buffer_size(), buffer->data_imag(), 0, NULL, &writes[1]);
     CHECK("clEnqueueWriteBuffer imag");
 
     // Enqueue the FFT
     err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 2, writes, &transform,
-                                 data.in_buffers(), data.out_buffers(), data.temp_buffer());
+                                 buffer->in_buffers(), buffer->out_buffers(), buffer->temp_buffer());
     CHECK("clEnqueueTransform");
     
     // Copy result to input array
-    err = clEnqueueReadBuffer(_queue, data.out_real(), CL_FALSE, 0,
-                               data.buffer_size(), data._real, 1, &transform, &reads[0]);
+    err = clEnqueueReadBuffer(_queue, buffer->out_real(), CL_FALSE, 0,
+                               buffer->buffer_size(), buffer->data_real(), 1, &transform, &reads[0]);
     CHECK("clEnqueueReadBuffer real");
     
-    err = clEnqueueReadBuffer(_queue, data.out_imag(), CL_FALSE, 0, 
-                               data.buffer_size(), data._imag, 1, &transform, &reads[1]);
+    err = clEnqueueReadBuffer(_queue, buffer->out_imag(), CL_FALSE, 0, 
+                               buffer->buffer_size(), buffer->data_imag(), 1, &transform, &reads[1]);
     CHECK("clEnqueueReadBuffer imag");
 
-    data.set_wait(reads);
+    buffer->set_wait(reads);
 
     return true;
+}
+
+void Fft::wait_all() {
+    _buffer->wait();
 }
 
 size_t Fft::getTempBufferSize() {
@@ -129,4 +141,11 @@ bool Fft::setupClFft() {
     CHECK("clfftBakePlan");
 
     return true;
+}
+
+FftBuffer* Fft::get_buffer() {
+    if (NULL == _buffer)
+        _buffer = new FftBuffer(*this);
+        
+    return _buffer;
 }

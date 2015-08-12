@@ -11,10 +11,9 @@
       return;                                   \
     }
 
-FftData::FftData(Fft& fft)
+FftBuffer::FftBuffer(Fft& fft)
   : _fft(fft),
-    _real(0),
-    _imag(0),
+    _job(NULL),
     _temp_buf(0),
     _wait_list{0}
 {
@@ -46,33 +45,66 @@ FftData::FftData(Fft& fft)
     }
 }
 
-FftData::~FftData() {
-    if (NULL != _in_buf[REAL])
+FftBuffer::~FftBuffer() {
+    release();
+}
+
+void FftBuffer::release() {
+
+    if (NULL != _in_buf[REAL]) {
         clReleaseMemObject(_in_buf[REAL]);
-    if (NULL != _in_buf[IMAG])
+        _in_buf[REAL] = NULL;
+    }
+    if (NULL != _in_buf[IMAG]) {
         clReleaseMemObject(_in_buf[IMAG]);
-    if (NULL != _out_buf[REAL])
+        _in_buf[IMAG] = NULL;
+    }
+    if (NULL != _out_buf[REAL]) {
         clReleaseMemObject(_out_buf[REAL]);
-    if (NULL != _out_buf[IMAG])
+        _out_buf[REAL] = NULL;
+    }
+    if (NULL != _out_buf[IMAG]) {
         clReleaseMemObject(_out_buf[IMAG]);
-    if (NULL != _temp_buf)
+        _out_buf[IMAG] = NULL;
+    }
+    if (NULL != _temp_buf) {
         clReleaseMemObject(_temp_buf);
+        _temp_buf = NULL;
+    }
 }
 
-void FftData::set(cl_float* real, cl_float* imag) {
-    _real = real;
-    _imag = imag;
-}
-
-void FftData::wait() {
+void FftBuffer::wait() {
     cl_int err = clWaitForEvents(2, _wait_list);
     CHECK("clWaitForEvents");
 }
 
-inline size_t FftData::get_fft_size() { 
+void dump_status(cl_int status) {
+    switch (status) {
+    case CL_COMPLETE:    std::cout << "CL_COMPLETE"    << std::endl; break;
+    case CL_SUBMITTED:   std::cout << "CL_SUBMITTED"   << std::endl; break;
+    case CL_QUEUED:      std::cout << "CL_QUEUED"      << std::endl; break;
+    case CL_RUNNING:     std::cout << "CL_RUNNING"     << std::endl; break;
+    }
+}
+
+bool FftBuffer::is_finished() {   
+    cl_int ret = 0;
+    cl_int real_info = 0;
+    cl_int imag_info = 0;
+    
+    ret = clGetEventInfo(_wait_list[REAL], CL_EVENT_COMMAND_EXECUTION_STATUS,
+                        sizeof(cl_int), (void*) &real_info, NULL);
+    ret = clGetEventInfo(_wait_list[IMAG], CL_EVENT_COMMAND_EXECUTION_STATUS,
+                        sizeof(cl_int), (void*) &imag_info, NULL);
+    dump_status(real_info);
+    dump_status(imag_info);
+    return CL_COMPLETE == real_info && CL_COMPLETE == imag_info;
+}
+
+inline size_t FftBuffer::get_fft_size() { 
     return _fft.get_size();
 }
 
-inline size_t FftData::buffer_size() {
+inline size_t FftBuffer::buffer_size() {
     return _fft.get_size() * sizeof(cl_float);
 }

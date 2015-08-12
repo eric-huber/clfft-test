@@ -1,20 +1,25 @@
-#ifndef __fftdata_hh
-#define __fftdata_hh
+#ifndef __FftBuffer_hh
+#define __FftBuffer_hh
 
 #include <clFFT.h>
 
 class Fft;
 
-class FftData {
+class FftBuffer {
 
 friend class Fft;
 
 public:
-    FftData(Fft& fft);
-    ~FftData();
+    FftBuffer(Fft& fft);
+    ~FftBuffer();
 
-    void        set(cl_float* real, cl_float* imag);
+    void        set_job(FftJob* job) { _job = job; }
+    FftJob*     get_job() { return _job; }
+
     void        wait();
+    bool        is_finished();
+
+    void        release();
 
     size_t      get_fft_size();
 
@@ -23,6 +28,9 @@ private:
 
 private:
     enum        BufferType {REAL=0, IMAG=1};
+
+    cl_float*   data_real()     { return _job->real(); }
+    cl_float*   data_imag()     { return _job->imag(); }
 
     cl_mem*     in_buffers()    { return _in_buf; }
     cl_mem*     out_buffers()   { return _out_buf; }
@@ -41,8 +49,7 @@ private:
 
 private:
     Fft&        _fft;
-    cl_float*   _real;
-    cl_float*   _imag;
+    FftJob*     _job;
     
     cl_mem      _in_buf[2];
     cl_mem      _out_buf[2];
@@ -51,4 +58,4 @@ private:
     cl_event    _wait_list[2];
 };
 
-#endif // __fftdata_hh
+#endif // __FftBuffer_hh

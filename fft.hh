@@ -4,28 +4,31 @@
 #include <clFFT.h>
 #include <vector>
 
-#include "fftdata.hh"
+#include "fftjob.hh"
+#include "fftbuffer.hh"
 
 class Fft {
     
 public:
     Fft(size_t fft_size);
 
-    bool init();
-    
-    void shutdown();
+    bool    init();    
+    void    shutdown();
 
-    size_t get_size() { return _fft_size; }
+    size_t  get_size() { return _fft_size; }
     
-    bool add(FftData& data);
+    bool    add(FftJob& job);
+    void    wait_all();
 
 public:
-    cl_context get_context() { return _context; }
-    size_t     getTempBufferSize();
+    cl_context  get_context() { return _context; }
+    size_t      getTempBufferSize();
 
 private:
     bool setupCl();
     bool setupClFft();
+
+    FftBuffer*  get_buffer();
 
 private:
     size_t              _fft_size;
@@ -34,8 +37,10 @@ private:
     cl_device_id        _device;
     cl_context          _context;
     cl_command_queue    _queue;
-\
     clfftPlanHandle     _planHandle;
+    
+    // TEMP 
+    FftBuffer*          _buffer;
 };
 
 #endif // __fft_h
