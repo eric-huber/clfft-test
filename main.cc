@@ -49,16 +49,15 @@ void time_fft(size_t size, int count, int loop, double range, double min) {
         return;
     }
 
+    nanoseconds total_duration;
+
     for (int outer = 0; outer < count; ++outer) {
         
         // start timer
         high_resolution_clock::time_point start = high_resolution_clock::now();
     
-        for (auto datum : buffer) {
-            // perform fft
-            //fft.add(*datum);
-        }
-        cout << "buffer added" << endl;
+        // perform fft
+        //fft.add(*datum);
     
         // wait for completion
         // ???
