@@ -62,7 +62,7 @@ bool Fft::add(FftJob& job) {
     err = clEnqueueWriteBuffer(_queue, buffer->in_real(), CL_FALSE, 0, 
                                 buffer->buffer_size(), buffer->data_real(), 0, NULL, &writes[0]);
     CHECK("clEnqueueWriteBuffer real");
-    
+
     err = clEnqueueWriteBuffer(_queue, buffer->in_imag(), CL_FALSE, 0,
                                 buffer->buffer_size(), buffer->data_imag(), 0, NULL, &writes[1]);
     CHECK("clEnqueueWriteBuffer imag");
@@ -71,12 +71,12 @@ bool Fft::add(FftJob& job) {
     err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 2, writes, &transform,
                                  buffer->in_buffers(), buffer->out_buffers(), buffer->temp_buffer());
     CHECK("clEnqueueTransform");
-    
+
     // Copy result to input array
     err = clEnqueueReadBuffer(_queue, buffer->out_real(), CL_FALSE, 0,
                                buffer->buffer_size(), buffer->data_real(), 1, &transform, &reads[0]);
     CHECK("clEnqueueReadBuffer real");
-    
+
     err = clEnqueueReadBuffer(_queue, buffer->out_imag(), CL_FALSE, 0, 
                                buffer->buffer_size(), buffer->data_imag(), 1, &transform, &reads[1]);
     CHECK("clEnqueueReadBuffer imag");

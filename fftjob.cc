@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <math.h>
 
 FftJob::FftJob(size_t size) 
  : _size(size)
@@ -25,6 +26,18 @@ void FftJob::copy(FftJob& other) {
     }    
 }
 
+void FftJob::compare(FftJob& other) {
+    
+    double diff = 0;
+    
+    for (int i = 0; i < _size; ++i) {
+        diff += abs(abs(_real[i]) - abs(other._real[i]));
+        diff += abs(abs(_imag[i]) - abs(other._imag[i])); 
+    }
+    diff /= 2 * _size;
+    std::cout << "Ave diff " << std::setprecision(10) << diff << std::endl;
+}
+
 void FftJob::randomize(double range, double min) {
     
     srand(time(NULL));
@@ -32,6 +45,14 @@ void FftJob::randomize(double range, double min) {
     for(int i = 0; i < _size; i++) {
         _real[i]  = (float) rand() / RAND_MAX * range + min;
         _imag[i]  = 0.0f;
+    }
+}
+
+void FftJob::periodic() {
+    for (int i = 0; i < _size; ++i) {
+        double t = i * .002;
+        _real[i] = sin(2 * M_PI * t);
+        _imag[i] = 0;
     }
 }
 

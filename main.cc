@@ -50,20 +50,22 @@ void invert_fft(size_t size, long count, double range, double min) {
     }
     
     FftJob forward(size);
-    forward.randomize(range, min);
+    //forward.randomize(range, min);
+    forward.periodic();
     
-    forward.write("initial.txt");
+    forward.write("fft-data.txt");
     
     // perform fft
     fft.add(forward);
     fft.wait_all();
     
-    forward.write("fft.txt");
+    forward.write("fft-forward.txt");
     
     // buffer for inversion
     FftJob reverse(size);
     reverse.copy(forward);
     reverse.invert();
+    reverse.write("fft-reverse-data.txt");
     
     // invert
     fft.add(reverse);
@@ -72,7 +74,9 @@ void invert_fft(size_t size, long count, double range, double min) {
     reverse.invert();
     reverse.scale(1.0 / (double) size);
     
-    reverse.write("ifft.txt");
+    reverse.write("fft-reverse.txt");
+    
+    forward.compare(reverse);
     
     fft.shutdown();
 }
@@ -135,7 +139,6 @@ void time_fft(size_t size, long count, double range, double min) {
     cerr << "\r100 %" << endl;
     cout << endl;
     cout << "Iterations: " << count << endl;
-    //cout << "Per loop:   " << loop << endl;
     cout << "Data size:  " << size << endl;
     cout << "Range:      " << range << endl;
     cout << "Min:        " << min << endl;

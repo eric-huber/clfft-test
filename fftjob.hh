@@ -9,7 +9,11 @@ public:
     
 public:
     void        copy(FftJob& other);
+    void        compare(FftJob& other);
+
     void        randomize(double range, double min);
+    void        periodic();
+
     void        invert();
     void        scale(double factor);
 
