@@ -37,7 +37,43 @@ void test_fft(size_t size, long count, double range, double min) {
 
     job.dump("FFT");
 
+    fft.shutdown();
     // cleanup
+}
+
+void invert_fft(size_t size, long count, double range, double min) {
+
+    Fft fft(size);
+    if (!fft.init()) {
+        fft.shutdown();
+        return;
+    }
+    
+    FftJob forward(size);
+    forward.randomize(range, min);
+    
+    forward.write("initial.txt");
+    
+    // perform fft
+    fft.add(forward);
+    fft.wait_all();
+    
+    forward.write("fft.txt");
+    
+    // buffer for inversion
+    FftJob reverse(size);
+    reverse.copy(forward);
+    reverse.invert();
+    
+    // invert
+    fft.add(reverse);
+    fft.wait_all();
+    
+    reverse.invert();
+    reverse.scale(1.0 / (double) size);
+    
+    reverse.write("ifft.txt");
+    
     fft.shutdown();
 }
 
@@ -114,14 +150,15 @@ int main(int ac, char* av[]) {
     long    count       = 1e9;
     double  range       = 25.0;
     double  min         = 0.0;
+    bool    invert      = false;
 
     try {
         
         po::options_description desc("Allowed options");
     
         desc.add_options()
-        ("help,h",   "produce help message")
-        ("count,c",  po::value<long>(), "set the number of timed loops to perform")
+        ("help,h",   "Produce help message")
+        ("count,c",  po::value<long>(), "Set the number of timed loops to perform")
         ("size,s",   po::value<int>(), "Set the size of the buffer buffer [8192]")
         ("range,r",  po::value<double>(), "Set the range of the random buffer [25.0]")
         ("min,m",    po::value<double>(), "Set the minimum value of the random buffer [0.0]")
@@ -151,6 +188,10 @@ int main(int ac, char* av[]) {
         if (vm.count("min")) {
             min = vm["min"].as<double>();
         }
+        
+        if (vm.count("invert")) {
+            invert = true;
+        }
 
     } catch (exception& e) {
         cerr << "Error: " << e.what() << endl;
@@ -163,9 +204,12 @@ int main(int ac, char* av[]) {
     // to nearest 16
     count = ((int) ceil(count / 16.0) + 1) * 16;
 
-    test_fft(fft_size, count, range, min);
+    //test_fft(fft_size, count, range, min);
     
-    time_fft(fft_size, count, range, min);
+    if (invert)
+        invert_fft(fft_size, count, range, min);
+    else    
+        time_fft(fft_size, count, range, min);
     
     return 0;
 }

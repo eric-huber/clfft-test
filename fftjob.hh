@@ -8,8 +8,14 @@ public:
     ~FftJob();
     
 public:
+    void        copy(FftJob& other);
     void        randomize(double range, double min);
+    void        invert();
+    void        scale(double factor);
+
     void        dump(std::string label);
+    void        write(std::string file);
+
     void        release();
   
     cl_float*   real() { return _real; }

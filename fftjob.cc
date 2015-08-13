@@ -3,6 +3,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 
 FftJob::FftJob(size_t size) 
@@ -17,6 +18,13 @@ FftJob::~FftJob() {
     release();
 }
 
+void FftJob::copy(FftJob& other) {
+    for (int i = 0; i < _size; ++i) {
+        _real[i] = other._real[i];
+        _imag[i] = other._imag[i];
+    }    
+}
+
 void FftJob::randomize(double range, double min) {
     
     srand(time(NULL));
@@ -24,6 +32,21 @@ void FftJob::randomize(double range, double min) {
     for(int i = 0; i < _size; i++) {
         _real[i]  = (float) rand() / RAND_MAX * range + min;
         _imag[i]  = 0.0f;
+    }
+}
+
+void FftJob::invert() {
+    for (int i = 0; i < _size; ++i) {
+        cl_float swap = _real[i];
+        _real[i] = _imag[i];
+        _imag[i] = swap;
+    }   
+}
+
+void FftJob::scale(double factor) {
+    for (int i = 0; i < _size; ++i) {
+        _real[i] *= factor;
+        _imag[i] *= factor;
     }
 }
 
@@ -40,6 +63,17 @@ void FftJob::dump(std::string label) {
         }
         std::cout << std::endl;
     }
+}
+
+void FftJob::write(std::string filename) {
+    std::ofstream ofs;
+    ofs.open(filename);
+    
+    for (int i = 0; i < _size; ++i) {
+        ofs << _real[i] << ", " << _imag[i] << std::endl;
+    }
+    
+    ofs.close();   
 }
 
 void FftJob::release() {
