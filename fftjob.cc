@@ -43,16 +43,18 @@ void FftJob::randomize(double range, double min) {
     srand(time(NULL));
 
     for(int i = 0; i < _size; i++) {
-        _real[i]  = (float) rand() / RAND_MAX * range + min;
-        _imag[i]  = 0.0f;
+        double rnd = (float) rand() / RAND_MAX * range + min;
+        _real[i]  = rnd;
+        _imag[i]  = rnd;
     }
 }
 
 void FftJob::periodic() {
     for (int i = 0; i < _size; ++i) {
         double t = i * .002;
-        _real[i] = sin(2 * M_PI * t);
-        _imag[i] = 0;
+        double amp = sin(2 * M_PI * t); 
+        _real[i] = amp;
+        _imag[i] = amp;
     }
 }
 
