@@ -14,9 +14,9 @@ using namespace chrono;
 
 namespace po = boost::program_options;
 
-void test_fft(size_t size, long count, double range, double min) {
+void test_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
 
-    Fft fft(size);
+    Fft fft(size, use_cpu, parallel);
     if (!fft.init()) {
         fft.shutdown();
         return;
@@ -41,9 +41,9 @@ void test_fft(size_t size, long count, double range, double min) {
     // cleanup
 }
 
-void invert_fft(size_t size, long count, double range, double min) {
+void invert_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
 
-    Fft fft(size);
+    Fft fft(size, use_cpu, parallel);
     if (!fft.init()) {
         fft.shutdown();
         return;
@@ -81,11 +81,11 @@ void invert_fft(size_t size, long count, double range, double min) {
     fft.shutdown();
 }
 
-void time_fft(size_t size, long count, double range, double min) {
+void time_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
 
     cout << "Timing..." << endl;
 
-    Fft fft(size);
+    Fft fft(size, use_cpu, parallel);
     if (!fft.init()) {
         fft.shutdown();
         return;
@@ -96,7 +96,7 @@ void time_fft(size_t size, long count, double range, double min) {
     nanoseconds total_duration(0);
     int last_percent = -1;
 
-    for (int outer = 0; outer < count; outer += 16) {
+    for (int outer = 0; outer < count; outer += parallel) {
         
         // randomize data 
         for (auto job : jobs) {
@@ -138,6 +138,8 @@ void time_fft(size_t size, long count, double range, double min) {
     cout.precision(8);
     cerr << "\r100 %" << endl;
     cout << endl;
+    cout << "Hardware:   " << (use_cpu ? "CPU" : "GPU") << endl;
+    cout << "Parallel:   " << parallel << endl;
     cout << "Iterations: " << count << endl;
     cout << "Data size:  " << size << endl;
     cout << "Range:      " << range << endl;
@@ -150,6 +152,8 @@ void time_fft(size_t size, long count, double range, double min) {
 int main(int ac, char* av[]) {
 
     size_t  fft_size    = 8192;
+    bool    use_cpu     = false;
+    int     parallel    = 16;
     long    count       = 1e9;
     double  range       = 25.0;
     double  min         = 0.0;
@@ -160,12 +164,14 @@ int main(int ac, char* av[]) {
         po::options_description desc("Allowed options");
     
         desc.add_options()
-        ("help,h",   "Produce help message")
-        ("count,c",  po::value<long>(), "Set the number of timed loops to perform")
-        ("size,s",   po::value<int>(), "Set the size of the buffer buffer [8192]")
-        ("range,r",  po::value<double>(), "Set the range of the random buffer [25.0]")
-        ("min,m",    po::value<double>(), "Set the minimum value of the random buffer [0.0]")
-        ("invert,i", "Perform an FFT, then an inverse FFT on the same buffer");
+        ("help,h",      "Produce help message")
+        ("cpu,c",       "Force CPU usage")
+        ("parallel,p",  po::value<int>(), "Jobs to perform in parallel")
+        ("iter,i",      po::value<long>(), "Set the number of iterations to perform")
+        ("size,s",      po::value<int>(), "Set the size of the buffer buffer [8192]")
+        ("range,r",     po::value<double>(), "Set the range of the random buffer [25.0]")
+        ("min,m",       po::value<double>(), "Set the minimum value of the random buffer [0.0]")
+        ("invert,i",    "Perform an FFT, then an inverse FFT on the same buffer");
 
         po::variables_map vm;
         po::store(po::parse_command_line(ac, av, desc), vm);
@@ -175,9 +181,17 @@ int main(int ac, char* av[]) {
             cout << desc << "\n";
             return 1;
         }
+        
+        if (vm.count("cpu")) {
+            use_cpu = true;
+        }
+        
+        if (vm.count("parallel")) {
+            parallel = vm["parallel"].as<int>();
+        }
 
-        if (vm.count("count")) {
-            count = vm["count"].as<long>();
+        if (vm.count("iter")) {
+            count = vm["iter"].as<long>();
         }
 
         if (vm.count("size")) {
@@ -207,12 +221,12 @@ int main(int ac, char* av[]) {
     // to nearest 16
     count = ((int) ceil(count / 16.0) + 1) * 16;
 
-    //test_fft(fft_size, count, range, min);
+    //test_fft(fft_size, use_cpu, parallel, count, range, min);
     
     if (invert)
-        invert_fft(fft_size, count, range, min);
+        invert_fft(fft_size, use_cpu, parallel, count, range, min);
     else    
-        time_fft(fft_size, count, range, min);
+        time_fft(fft_size, use_cpu, parallel, count, range, min);
     
     return 0;
 }

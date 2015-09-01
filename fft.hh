@@ -10,7 +10,7 @@
 class Fft {
     
 public:
-    Fft(size_t fft_size);
+    Fft(size_t fft_size, bool use_cpu, int parallel);
 
     bool    init();    
     void    shutdown();
@@ -33,6 +33,8 @@ private:
 
 private:
     size_t                  _fft_size;
+    bool                    _use_cpu;
+    int                     _parallel;
 
     cl_platform_id          _platform;
     cl_device_id            _device;

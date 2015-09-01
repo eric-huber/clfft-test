@@ -3,8 +3,6 @@
 
 #include "fft.hh"
 
-#define BUFFERS     16
-
 #define CHECK(MSG)                              \
     if (err != CL_SUCCESS) {                    \
       std::cerr << __FILE__ << ":" << __LINE__  \
@@ -14,8 +12,10 @@
     }
 
 
-Fft::Fft(size_t fft_size)
-  : _fft_size(fft_size)
+Fft::Fft(size_t fft_size, bool use_cpu, int parallel)
+  : _fft_size(fft_size),
+    _use_cpu(use_cpu),
+    _parallel(parallel)
 {
 }
 
@@ -29,7 +29,7 @@ bool Fft::init() {
 void Fft::shutdown() {
     
     if (_buffers.empty()) {
-        for (int i = BUFFERS-1; 0 <= i; --i) {
+        for (int i = _parallel-1; 0 <= i; --i) {
             _buffers.at(i)->release();
             _buffers.pop_back();
         }
@@ -107,7 +107,10 @@ bool Fft::setup_cl() {
     CHECK("clGetPlatformIds");
 
     // Setup devices
-    err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_GPU, 1, &_device, NULL);
+    if (_use_cpu)
+        err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_CPU, 1, &_device, NULL);
+    else
+        err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_GPU, 1, &_device, NULL);
     CHECK("clGetDeviceIds GPU");
 
     // Setup context
@@ -156,7 +159,7 @@ bool Fft::setup_clFft() {
 }
 
 bool Fft::setup_buffers() {
-    for (int i = 0; i < BUFFERS; ++i) {
+    for (int i = 0; i < _parallel; ++i) {
         _buffers.push_back(new FftBuffer(*this));
     }
 }
