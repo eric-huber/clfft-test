@@ -5,7 +5,7 @@ CXXFLAGS += -std=c++11
 LDFLAGS  += -lboost_program_options
 LDFLAGS  += -lclFFT -L/opt/intel/opencl -lm -lOpenCL 
 
-PROG=ffttest
+PROG=clfft-test
 OBJS=fft.o \
      fftjob.o \
      fftbuffer.o \
