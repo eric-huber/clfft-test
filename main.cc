@@ -219,7 +219,7 @@ int main(int ac, char* av[]) {
     }
 
     // to nearest 16
-    count = ((int) ceil(count / 16.0) + 1) * 16;
+    count = ((int) ceil(count / parallel)) * parallel;
 
     //test_fft(fft_size, use_cpu, parallel, count, range, min);
     
