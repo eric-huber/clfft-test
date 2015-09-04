@@ -17,7 +17,8 @@ public:
 
     size_t  get_size() { return _fft_size; }
     
-    bool    add(FftJob& job);
+    bool    forward(FftJob& job);
+    bool    backward(FftJob& job);
     void    wait_all();
 
 public:

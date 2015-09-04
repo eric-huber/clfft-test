@@ -14,6 +14,10 @@ using namespace chrono;
 
 namespace po = boost::program_options;
 
+const char* _data_file_name = "fft-data.txt";
+const char* _fft_file_name  = "fft-forward.txt";
+const char* _bak_file_name  = "fft-backward.txt";
+
 void test_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
 
     Fft fft(size, use_cpu, parallel);
@@ -25,23 +29,23 @@ void test_fft(size_t size, bool use_cpu, int parallel, long count, double range,
     FftJob job(size);
     job.randomize(range, min);
 
-    job.dump("Initial random buffer");
+    job.write(_data_file_name);
 
     // perform fft
-    fft.add(job);
+    fft.forward(job);
 
     // wait for completion
     fft.wait_all();
 
     //buffer.is_finished();
 
-    job.dump("FFT");
+    job.write(_fft_file_name);
 
     fft.shutdown();
     // cleanup
 }
 
-void invert_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
+void reverse_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
 
     Fft fft(size, use_cpu, parallel);
     if (!fft.init()) {
@@ -53,28 +57,27 @@ void invert_fft(size_t size, bool use_cpu, int parallel, long count, double rang
     //forward.randomize(range, min);
     forward.periodic();
     
-    forward.write("fft-data.txt");
+    forward.write(_data_file_name);
     
     // perform fft
-    fft.add(forward);
+    fft.forward(forward);
     fft.wait_all();
     
-    forward.write("fft-forward.txt");
+    forward.write(_fft_file_name);
     
     // buffer for inversion
     FftJob reverse(size);
     reverse.copy(forward);
     reverse.invert();
-    reverse.write("fft-reverse-data.txt");
     
-    // invert
-    fft.add(reverse);
+    // reverse
+    fft.backward(reverse);
     fft.wait_all();
     
     reverse.invert();
     reverse.scale(1.0 / (double) size);
     
-    reverse.write("fft-reverse.txt");
+    reverse.write(_bak_file_name);
     
     forward.compare(reverse);
     
@@ -108,7 +111,7 @@ void time_fft(size_t size, bool use_cpu, int parallel, long count, double range,
     
         // queue ffts
         for (auto job : jobs) {
-            fft.add(job);
+            fft.forward(job);
         }
     
         // wait for completion
@@ -153,11 +156,12 @@ int main(int ac, char* av[]) {
 
     size_t  fft_size    = 8192;
     bool    use_cpu     = false;
+    bool    reverse      = false;
+    bool    time        = false;
     int     parallel    = 16;
     long    count       = 1e9;
     double  range       = 25.0;
     double  min         = 0.0;
-    bool    invert      = false;
 
     try {
         
@@ -166,12 +170,13 @@ int main(int ac, char* av[]) {
         desc.add_options()
         ("help,h",      "Produce help message")
         ("cpu,c",       "Force CPU usage")
+        ("reverse,i",   "Perform an FFT, then an inverse FFT on the same buffer")
+        ("time,t",      "Time the FFT operation")
         ("parallel,p",  po::value<int>(), "Jobs to perform in parallel")
         ("iter,i",      po::value<long>(), "Set the number of iterations to perform")
         ("size,s",      po::value<int>(), "Set the size of the buffer buffer [8192]")
-        ("range,r",     po::value<double>(), "Set the range of the random buffer [25.0]")
-        ("min,m",       po::value<double>(), "Set the minimum value of the random buffer [0.0]")
-        ("invert,i",    "Perform an FFT, then an inverse FFT on the same buffer");
+        ("range,a",     po::value<double>(), "Set the range of the random buffer [25.0]")
+        ("min,m",       po::value<double>(), "Set the minimum value of the random buffer [0.0]");
 
         po::variables_map vm;
         po::store(po::parse_command_line(ac, av, desc), vm);
@@ -184,6 +189,14 @@ int main(int ac, char* av[]) {
         
         if (vm.count("cpu")) {
             use_cpu = true;
+        }
+        
+        if (vm.count("reverse")) {
+            reverse = true;
+        }
+        
+        if (vm.count("time")) {
+            time = true;
         }
         
         if (vm.count("parallel")) {
@@ -205,10 +218,6 @@ int main(int ac, char* av[]) {
         if (vm.count("min")) {
             min = vm["min"].as<double>();
         }
-        
-        if (vm.count("invert")) {
-            invert = true;
-        }
 
     } catch (exception& e) {
         cerr << "Error: " << e.what() << endl;
@@ -221,12 +230,12 @@ int main(int ac, char* av[]) {
     // to nearest 16
     count = ((int) ceil(count / parallel)) * parallel;
 
-    //test_fft(fft_size, use_cpu, parallel, count, range, min);
-    
-    if (invert)
-        invert_fft(fft_size, use_cpu, parallel, count, range, min);
-    else    
+    if (reverse)
+        reverse_fft(fft_size, use_cpu, parallel, count, range, min);
+    else if (time)    
         time_fft(fft_size, use_cpu, parallel, count, range, min);
+    else
+        test_fft(fft_size, use_cpu, parallel, count, range, min);
     
     return 0;
 }

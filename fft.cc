@@ -44,7 +44,7 @@ void Fft::shutdown() {
     clReleaseContext(_context);
 }
 
-bool Fft::add(FftJob& job) {
+bool Fft::forward(FftJob& job) {
     cl_int err = 0;
    
     cl_event writes[2]  = {0};
@@ -69,6 +69,49 @@ bool Fft::add(FftJob& job) {
 
     // Enqueue the FFT
     err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 2, writes, &transform,
+                                 buffer->in_buffers(), buffer->out_buffers(), buffer->temp_buffer());
+    CHECK("clEnqueueTransform");
+
+    // Copy result to input array
+    err = clEnqueueReadBuffer(_queue, buffer->out_real(), CL_FALSE, 0,
+                               buffer->buffer_size(), buffer->data_real(), 1, &transform, &reads[0]);
+    CHECK("clEnqueueReadBuffer real");
+
+    err = clEnqueueReadBuffer(_queue, buffer->out_imag(), CL_FALSE, 0, 
+                               buffer->buffer_size(), buffer->data_imag(), 1, &transform, &reads[1]);
+    CHECK("clEnqueueReadBuffer imag");
+
+    buffer->set_wait(reads);
+
+    return true;
+}
+
+
+bool Fft::backward(FftJob& job) {
+    cl_int err = 0;
+   
+    cl_event writes[2]  = {0};
+    cl_event reads[2] = {0};
+    cl_event transform = 0;
+
+    // get buffer (may block)
+    FftBuffer* buffer = get_buffer();
+    // temp - no buffer? return false
+    if (NULL == buffer)
+        return NULL;
+    buffer->set_job(&job);
+
+    // Enqueue write tab array into _local_buffers[0]. 
+    err = clEnqueueWriteBuffer(_queue, buffer->in_real(), CL_FALSE, 0, 
+                                buffer->buffer_size(), buffer->data_real(), 0, NULL, &writes[0]);
+    CHECK("clEnqueueWriteBuffer real");
+
+    err = clEnqueueWriteBuffer(_queue, buffer->in_imag(), CL_FALSE, 0,
+                                buffer->buffer_size(), buffer->data_imag(), 0, NULL, &writes[1]);
+    CHECK("clEnqueueWriteBuffer imag");
+
+    // Enqueue the FFT
+    err = clfftEnqueueTransform(_planHandle, CLFFT_BACKWARD, 1, &_queue, 2, writes, &transform,
                                  buffer->in_buffers(), buffer->out_buffers(), buffer->temp_buffer());
     CHECK("clEnqueueTransform");
 
