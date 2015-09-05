@@ -170,7 +170,7 @@ int main(int ac, char* av[]) {
         desc.add_options()
         ("help,h",      "Produce help message")
         ("cpu,c",       "Force CPU usage")
-        ("reverse,i",   "Perform an FFT, then an inverse FFT on the same buffer")
+        ("reverse,r",   "Perform an FFT, then an inverse FFT on the same buffer")
         ("time,t",      "Time the FFT operation")
         ("parallel,p",  po::value<int>(), "Jobs to perform in parallel")
         ("iter,i",      po::value<long>(), "Set the number of iterations to perform")
