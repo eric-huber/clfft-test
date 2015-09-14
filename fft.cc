@@ -21,7 +21,7 @@ Fft::Fft(size_t fft_size, bool use_cpu, int parallel)
 
 bool Fft::init() {
 
-    if (setup_cl() && setup_clFft() && setup_buffers())
+    if (select_platform() && setup_cl() && setup_clFft() && setup_buffers())
         return true;
     return false;
 }
@@ -142,19 +142,46 @@ size_t Fft::get_temp_buffer_size() {
     return 0 == status ? size : 0;
 }
 
+bool Fft::select_platform() {
+    cl_int          err = 0;
+    cl_uint         platform_count = 0;
+    cl_platform_id  platform[5];
+    cl_device_type  type = _use_cpu ? CL_DEVICE_TYPE_CPU : CL_DEVICE_TYPE_GPU;
+
+    err = clGetPlatformIDs(0, NULL, &platform_count);
+    CHECK("clGetPlatformIds - platform count");
+    
+    err = clGetPlatformIDs(5, platform, NULL);
+    CHECK("clGetPlatformIds - list of platforms");
+    
+    for (uint i = 0; i < platform_count; ++i) {
+        err = clGetDeviceIDs(platform[i], type, 1, &_device, NULL);
+        if (err == CL_SUCCESS) {
+            _platform = platform[i];
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 bool Fft::setup_cl() {
     cl_int err = 0;
 
+    /*
     // Setup platform 
     err = clGetPlatformIDs(1, &_platform, NULL);
     CHECK("clGetPlatformIds");
 
     // Setup devices
-    if (_use_cpu)
+    if (_use_cpu) {
         err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_CPU, 1, &_device, NULL);
-    else
+        CHECK("clGetDeviceIds GPU");
+    } else {
         err = clGetDeviceIDs(_platform, CL_DEVICE_TYPE_GPU, 1, &_device, NULL);
-    CHECK("clGetDeviceIds GPU");
+        CHECK("clGetDeviceIds GPU");
+    }
+    */
 
     // Setup context
     cl_context_properties props[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) _platform, 0};

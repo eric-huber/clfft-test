@@ -26,6 +26,7 @@ public:
     size_t      get_temp_buffer_size();
 
 private:
+    bool select_platform();
     bool setup_cl();
     bool setup_clFft();
     bool setup_buffers();
