@@ -9,7 +9,13 @@ public:
     
 public:
     void        copy(FftJob& other);
-    void        compare(FftJob& other);
+    
+    double      compare(FftJob& other);
+    
+    double      signal_to_quant_error(FftJob& inverse);
+    double      signal_energy();
+    double      quant_error_energy(FftJob& inverse);
+    
 
     void        randomize(double range, double min);
     void        periodic();
@@ -23,11 +29,12 @@ public:
     void        release();
   
     cl_float*   real() { return _real; }
-    cl_float*   imag() { return _imag; }  
+    cl_float*   imag() { return _imag; }
+
   
 private:
     size_t      _size;
 
     cl_float*   _real;
-    cl_float*   _imag;    
+    cl_float*   _imag;
 };

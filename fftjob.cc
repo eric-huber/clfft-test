@@ -26,7 +26,7 @@ void FftJob::copy(FftJob& other) {
     }    
 }
 
-void FftJob::compare(FftJob& other) {
+double FftJob::compare(FftJob& other) {
     
     double diff = 0;
     
@@ -35,7 +35,30 @@ void FftJob::compare(FftJob& other) {
         diff += abs(abs(_imag[i]) - abs(other._imag[i])); 
     }
     diff /= 2 * _size;
-    std::cout << "Ave diff " << std::setprecision(10) << diff << std::endl;
+    return diff;
+}
+
+double FftJob::signal_to_quant_error(FftJob& inverse) {
+    
+    return 10.0 * log10(signal_energy() / quant_error_energy(inverse));
+}
+
+double FftJob::signal_energy() {
+    double energy = 0;
+    for (int i = 0; i < _size; ++i) {
+        energy += _real[i] * _real[i];
+    }
+    return energy;
+}
+
+double FftJob::quant_error_energy(FftJob& inverse) {
+    
+    double energy = 0;
+    for (int i = 0; i < _size; ++i) {
+        double diff = _real[i] - inverse._real[i];
+        energy += diff * diff;
+    }
+    return energy;
 }
 
 void FftJob::randomize(double range, double min) {

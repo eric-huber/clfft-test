@@ -81,7 +81,11 @@ void reverse_fft(size_t size, Fft::Device device, int parallel,
     
     reverse.write(_bak_file_name);
     
-    forward.compare(reverse);
+    cout << "FFT/IFFT computed. Data saved." << endl;
+    cout << "Average Difference :            " << std::setprecision(4) 
+        << forward.compare(reverse) << endl;
+    cout << "Signal to Quantinization Error: " << std::setprecision(4) 
+        << forward.signal_to_quant_error(reverse) << endl;
     
     fft.shutdown();
 }
