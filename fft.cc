@@ -12,9 +12,9 @@
     }
 
 
-Fft::Fft(size_t fft_size, bool use_cpu, int parallel)
+Fft::Fft(size_t fft_size, Device device, int parallel)
   : _fft_size(fft_size),
-    _use_cpu(use_cpu),
+    _device_type(device),
     _parallel(parallel)
 {
 }
@@ -146,7 +146,17 @@ bool Fft::select_platform() {
     cl_int          err = 0;
     cl_uint         platform_count = 0;
     cl_platform_id  platform[5];
-    cl_device_type  type = _use_cpu ? CL_DEVICE_TYPE_CPU : CL_DEVICE_TYPE_GPU;
+    cl_device_type  type;
+    
+    switch (_device_type) {
+    default:
+    case GPU:
+        type = CL_DEVICE_TYPE_GPU;
+        break;
+    case CPU:
+        type = CL_DEVICE_TYPE_CPU;
+        break;
+    }
 
     // get list of platforms
     err = clGetPlatformIDs(0, NULL, &platform_count);

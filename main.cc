@@ -18,9 +18,10 @@ const char* _data_file_name = "fft-data.txt";
 const char* _fft_file_name  = "fft-forward.txt";
 const char* _bak_file_name  = "fft-backward.txt";
 
-void test_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
+void test_fft(size_t size, Fft::Device device, int parallel, 
+              long count, double range, double min) {
 
-    Fft fft(size, use_cpu, parallel);
+    Fft fft(size, device, parallel);
     if (!fft.init()) {
         fft.shutdown();
         return;
@@ -45,9 +46,10 @@ void test_fft(size_t size, bool use_cpu, int parallel, long count, double range,
     // cleanup
 }
 
-void reverse_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
+void reverse_fft(size_t size, Fft::Device device, int parallel, 
+                 long count, double range, double min) {
 
-    Fft fft(size, use_cpu, parallel);
+    Fft fft(size, device, parallel);
     if (!fft.init()) {
         fft.shutdown();
         return;
@@ -84,11 +86,12 @@ void reverse_fft(size_t size, bool use_cpu, int parallel, long count, double ran
     fft.shutdown();
 }
 
-void time_fft(size_t size, bool use_cpu, int parallel, long count, double range, double min) {
+void time_fft(size_t size, Fft::Device device, int parallel, 
+             long count, double range, double min) {
 
     cout << "Timing..." << endl;
 
-    Fft fft(size, use_cpu, parallel);
+    Fft fft(size, device, parallel);
     if (!fft.init()) {
         fft.shutdown();
         return;
@@ -141,7 +144,12 @@ void time_fft(size_t size, bool use_cpu, int parallel, long count, double range,
     cout.precision(8);
     cerr << "\r100 %" << endl;
     cout << endl;
-    cout << "Hardware:   " << (use_cpu ? "CPU" : "GPU") << endl;
+    cout << "Hardware:   ";
+    if (Fft::CPU == device)
+        cout << "CPU" << endl;
+    else
+        cout << "GPU" << endl;
+    cout << "Precision:  Single" << endl;
     cout << "Parallel:   " << parallel << endl;
     cout << "Iterations: " << count << endl;
     cout << "Data size:  " << size << endl;
@@ -154,14 +162,14 @@ void time_fft(size_t size, bool use_cpu, int parallel, long count, double range,
 
 int main(int ac, char* av[]) {
 
-    size_t  fft_size    = 8192;
-    bool    use_cpu     = false;
-    bool    reverse      = false;
-    bool    time        = false;
-    int     parallel    = 16;
-    long    count       = 1e9;
-    double  range       = 25.0;
-    double  min         = 0.0;
+    size_t          fft_size        = 8192;
+    Fft::Device     device          = Fft::GPU; 
+    bool            reverse         = false;
+    bool            time            = false;
+    int             parallel        = 16;
+    long            count           = 1e9;
+    double          range           = 25.0;
+    double          min             = 0.0;
 
     try {
         
@@ -188,7 +196,7 @@ int main(int ac, char* av[]) {
         }
         
         if (vm.count("cpu")) {
-            use_cpu = true;
+            device = Fft::CPU;
         }
         
         if (vm.count("reverse")) {
@@ -231,11 +239,11 @@ int main(int ac, char* av[]) {
     count = ((int) ceil(count / parallel)) * parallel;
 
     if (reverse)
-        reverse_fft(fft_size, use_cpu, parallel, count, range, min);
+        reverse_fft(fft_size, device, parallel, count, range, min);
     else if (time)    
-        time_fft(fft_size, use_cpu, parallel, count, range, min);
+        time_fft(fft_size, device, parallel, count, range, min);
     else
-        test_fft(fft_size, use_cpu, parallel, count, range, min);
+        test_fft(fft_size, device, parallel, count, range, min);
     
     return 0;
 }

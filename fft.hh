@@ -8,9 +8,12 @@
 #include "fftbuffer.hh"
 
 class Fft {
+
+public:
+    enum Device    {GPU, CPU};
     
 public:
-    Fft(size_t fft_size, bool use_cpu, int parallel);
+    Fft(size_t fft_size, Device device, int parallel);
 
     bool    init();    
     void    shutdown();
@@ -35,7 +38,7 @@ private:
 
 private:
     size_t                  _fft_size;
-    bool                    _use_cpu;
+    Device                  _device_type;
     int                     _parallel;
 
     cl_platform_id          _platform;
