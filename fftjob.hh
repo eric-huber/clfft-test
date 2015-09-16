@@ -10,8 +10,7 @@ public:
 public:
     void        copy(FftJob& other);
     
-    double      compare(FftJob& other);
-    
+    double      rms(FftJob& inverse);    
     double      signal_to_quant_error(FftJob& inverse);
     double      signal_energy();
     double      quant_error_energy(FftJob& inverse);  
@@ -32,6 +31,9 @@ public:
     cl_float    at(int index)       { return _data[index]; }
     cl_float    at_hr(int index)    { return _data[2 * index]; }
     cl_float    at_hi(int index)    { return _data[2 * index + 1]; }
+    
+    int         size()              { return _size; }
+    int         size_h()            { return _size / 2; }
   
 private:
     size_t      _size;

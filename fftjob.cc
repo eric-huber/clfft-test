@@ -24,26 +24,27 @@ void FftJob::copy(FftJob& other) {
     }    
 }
 
-double FftJob::compare(FftJob& other) {
+double FftJob::rms(FftJob& inverse) {
     
-    double diff = 0;
+    double rms = 0;
     
     for (int i = 0; i < _size; ++i) {
-        diff += abs(abs(_data[i]) - abs(other._data[i]));
+        rms += pow(inverse.at(i) - at(i), 2);
     }
-    diff /= _size;
-    return diff;
+    rms /= size();
+    rms = sqrt(rms);
+    return rms;
 }
 
 double FftJob::signal_to_quant_error(FftJob& inverse) {
     
-    return 10.0 * log10(signal_energy() / quant_error_energy(inverse));
+    return 10.0 * log10( signal_energy() / quant_error_energy(inverse) );
 }
 
 double FftJob::signal_energy() {
     double energy = 0;
     for (int i = 0; i < _size; ++i) {
-        energy += _data[i] * _data[i];
+        energy += pow(at(i), 2);
     }
     return energy;
 }
@@ -52,8 +53,7 @@ double FftJob::quant_error_energy(FftJob& inverse) {
     
     double energy = 0;
     for (int i = 0; i < _size; ++i) {
-        double diff = _data[i] - inverse._data[i];
-        energy += diff * diff;
+        energy += pow(at(i) - inverse.at(i), 2);
     }
     return energy;
 }
@@ -114,7 +114,7 @@ void FftJob::write_hermitian(std::string filename) {
     for (int i = 0; i < _size / 2; ++i) {
         auto real = at_hr(i);
         auto imag = at_hi(i);
-        auto amplitude = sqrt(real * real + imag * imag);
+        auto amplitude = sqrt(pow(real, 2) + pow(imag, 2));
         auto phase = atan2(imag, real);
         ofs << real << ", " << imag << ", " << amplitude << ", " << phase << std::endl;
     }

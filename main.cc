@@ -79,8 +79,8 @@ void reverse_fft(size_t size, Fft::Device device, int parallel,
     
     cout << "FFT/IFFT computed." << endl;
     cout << "Data saved." << endl;
-    cout << "Average Difference :            " << std::setprecision(4) 
-        << forward.compare(reverse) << endl;
+    cout << "Root Mean Square :              " << std::setprecision(4) 
+        << forward.rms(reverse) << endl;
     cout << "Signal to Quantinization Error: " << std::setprecision(4) 
         << forward.signal_to_quant_error(reverse) << endl;
     
