@@ -37,7 +37,7 @@ public:
     int         size_h()            { return _size / 2; }
 
 private:
-    void        randomize(double range, double min);
+    void        randomize(double mean, double std);
     void        periodic();
     
 private:

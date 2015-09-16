@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <random>
 #include <math.h>
 
 FftJob::FftJob(size_t size) 
@@ -65,18 +66,21 @@ void FftJob::populate(FftJob::TestData data_type) {
         periodic();
         break;
     case RANDOM:
-        randomize(2, -1);
+        randomize(0.5, 0.2);
         break;
     }
 }
 
-void FftJob::randomize(double range, double min) {
+void FftJob::randomize(double mean, double std) {
+    
+    std::default_random_engine       generator(std::random_device{}());
+    std::normal_distribution<double> distribution(mean, std);
     
     srand(time(NULL));
 
     for(int i = 0; i < _size; i++) {
-        double rnd = (float) rand() / RAND_MAX * range + min;
-        _data[i]  = rnd;
+        double number = distribution(generator);
+        _data[i]  = number;
     }
 }
 
