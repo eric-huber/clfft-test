@@ -10,8 +10,7 @@
 FftJob::FftJob(size_t size) 
  : _size(size)
 {
-    _real  = new cl_float[_size];
-    _imag  = new cl_float[_size];
+    _data  = new cl_float[_size];
 }
 
 
@@ -21,8 +20,7 @@ FftJob::~FftJob() {
 
 void FftJob::copy(FftJob& other) {
     for (int i = 0; i < _size; ++i) {
-        _real[i] = other._real[i];
-        _imag[i] = other._imag[i];
+        _data[i] = other._data[i];
     }    
 }
 
@@ -31,10 +29,9 @@ double FftJob::compare(FftJob& other) {
     double diff = 0;
     
     for (int i = 0; i < _size; ++i) {
-        diff += abs(abs(_real[i]) - abs(other._real[i]));
-        diff += abs(abs(_imag[i]) - abs(other._imag[i])); 
+        diff += abs(abs(_data[i]) - abs(other._data[i]));
     }
-    diff /= 2 * _size;
+    diff /= _size;
     return diff;
 }
 
@@ -46,7 +43,7 @@ double FftJob::signal_to_quant_error(FftJob& inverse) {
 double FftJob::signal_energy() {
     double energy = 0;
     for (int i = 0; i < _size; ++i) {
-        energy += _real[i] * _real[i];
+        energy += _data[i] * _data[i];
     }
     return energy;
 }
@@ -55,7 +52,7 @@ double FftJob::quant_error_energy(FftJob& inverse) {
     
     double energy = 0;
     for (int i = 0; i < _size; ++i) {
-        double diff = _real[i] - inverse._real[i];
+        double diff = _data[i] - inverse._data[i];
         energy += diff * diff;
     }
     return energy;
@@ -67,8 +64,7 @@ void FftJob::randomize(double range, double min) {
 
     for(int i = 0; i < _size; i++) {
         double rnd = (float) rand() / RAND_MAX * range + min;
-        _real[i]  = rnd;
-        _imag[i]  = rnd;
+        _data[i]  = rnd;
     }
 }
 
@@ -76,23 +72,13 @@ void FftJob::periodic() {
     for (int i = 0; i < _size; ++i) {
         double t = i * .002;
         double amp = sin(2 * M_PI * t); 
-        _real[i] = amp;
-        _imag[i] = amp;
+        _data[i] = amp;
     }
-}
-
-void FftJob::invert() {
-    for (int i = 0; i < _size; ++i) {
-        cl_float swap = _real[i];
-        _real[i] = _imag[i];
-        _imag[i] = swap;
-    }   
 }
 
 void FftJob::scale(double factor) {
     for (int i = 0; i < _size; ++i) {
-        _real[i] *= factor;
-        _imag[i] *= factor;
+        _data[i] *= factor;
     }
 }
 
@@ -102,8 +88,7 @@ void FftJob::dump(std::string label) {
     
     for (int i = 0; i < 32; i = i + 4) {
         for (int j = 0; j < 4; ++j) { 
-            std::cout << std::setw(5) << std::setprecision(1) << std::fixed << std::setfill(' ') << _real[i + j] << "  ";
-            std::cout << std::setw(5) << std::setprecision(1) << std::fixed << std::setfill(' ') << _imag[i + j];
+            std::cout << std::setw(5) << std::setprecision(1) << std::fixed << std::setfill(' ') << _data[i + j];
             if (3 != j)
                 std::cout << "    ";
         }
@@ -116,19 +101,30 @@ void FftJob::write(std::string filename) {
     ofs.open(filename);
     
     for (int i = 0; i < _size; ++i) {
-        ofs << _real[i] << ", " << _imag[i] << std::endl;
+        ofs << _data[i] << std::endl;
+    }
+    
+    ofs.close();   
+}
+
+void FftJob::write_hermitian(std::string filename) {
+    std::ofstream ofs;
+    ofs.open(filename);
+    
+    for (int i = 0; i < _size; i += 2) {
+        auto real = _data[i];
+        auto imag = _data[i];
+        auto amplitude = sqrt(real * real + imag * imag);
+        auto phase = atan2(imag, real);
+        ofs << real << ", " << imag << ", " << amplitude << ", " << phase << std::endl;
     }
     
     ofs.close();   
 }
 
 void FftJob::release() {
-    if (NULL != _real) {
-        delete[] _real;
-        _real = NULL;
-    }
-    if (NULL != _imag) {
-        delete[] _imag;
-        _imag = NULL;
+    if (NULL != _data) {
+        delete[] _data;
+        _data = NULL;
     }
 }

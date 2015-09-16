@@ -27,38 +27,25 @@ public:
     void        set_in_use(bool in_use)     { _in_use = in_use; }
 
 private:
-    size_t      buffer_size();
+    size_t      size();
 
 private:
-    enum        BufferType {REAL=0, IMAG=1};
+    cl_float*   job_data()                  { return _job->data(); }
 
-    cl_float*   data_real()     { return _job->real(); }
-    cl_float*   data_imag()     { return _job->imag(); }
+    cl_mem      data()                      { return _data_buf; }
+    cl_mem*     data_addr()                 { return &_data_buf; }
+    cl_mem      temp()                      { return _temp_buf; }
 
-    cl_mem*     in_buffers()    { return _in_buf; }
-    cl_mem*     out_buffers()   { return _out_buf; }
-    cl_mem      temp_buffer()   { return _temp_buf; }
-    
-    cl_mem      in_real()       { return _in_buf[REAL]; }
-    cl_mem      in_imag()       { return _in_buf[IMAG]; }
-
-    cl_mem      out_real()      { return _out_buf[REAL]; }
-    cl_mem      out_imag()      { return _out_buf[IMAG]; }
-
-    void        set_wait(cl_event* wait) { 
-                        _wait_list[REAL] = wait[REAL]; 
-                        _wait_list[IMAG] = wait[IMAG];
-                    }
+    void        set_wait(cl_event wait)     { _wait = wait; }
 
 private:
     Fft&        _fft;
     FftJob*     _job;
     
-    cl_mem      _in_buf[2];
-    cl_mem      _out_buf[2];
+    cl_mem      _data_buf;
     cl_mem      _temp_buf;
     
-    cl_event    _wait_list[2];
+    cl_event    _wait;
     
     bool        _in_use;
 };

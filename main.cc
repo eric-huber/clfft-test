@@ -28,7 +28,8 @@ void test_fft(size_t size, Fft::Device device, int parallel,
     }
     
     FftJob job(size);
-    job.randomize(range, min);
+    //job.randomize(range, min);
+    job.periodic();
 
     job.write(_data_file_name);
 
@@ -56,7 +57,6 @@ void reverse_fft(size_t size, Fft::Device device, int parallel,
     }
     
     FftJob forward(size);
-    //forward.randomize(range, min);
     forward.periodic();
     
     forward.write(_data_file_name);
@@ -65,23 +65,20 @@ void reverse_fft(size_t size, Fft::Device device, int parallel,
     fft.forward(forward);
     fft.wait_all();
     
-    forward.write(_fft_file_name);
+    forward.write_hermitian(_fft_file_name);
     
     // buffer for inversion
     FftJob reverse(size);
     reverse.copy(forward);
-    reverse.invert();
     
     // reverse
     fft.backward(reverse);
     fft.wait_all();
-    
-    reverse.invert();
-    reverse.scale(1.0 / (double) size);
-    
+   
     reverse.write(_bak_file_name);
     
-    cout << "FFT/IFFT computed. Data saved." << endl;
+    cout << "FFT/IFFT computed." << endl;
+    cout << "Data saved." << endl;
     cout << "Average Difference :            " << std::setprecision(4) 
         << forward.compare(reverse) << endl;
     cout << "Signal to Quantinization Error: " << std::setprecision(4) 

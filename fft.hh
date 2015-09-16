@@ -32,6 +32,8 @@ private:
     bool select_platform();
     bool setup_cl();
     bool setup_clFft();
+    bool setup_forward();
+    bool setup_backward();
     bool setup_buffers();
 
     FftBuffer*  get_buffer();
@@ -45,7 +47,8 @@ private:
     cl_device_id            _device;
     cl_context              _context;
     cl_command_queue        _queue;
-    clfftPlanHandle         _planHandle;
+    clfftPlanHandle         _forward;
+    clfftPlanHandle         _backward;
     
     std::vector<FftBuffer*> _buffers;
 };

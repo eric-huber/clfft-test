@@ -21,7 +21,12 @@ Fft::Fft(size_t fft_size, Device device, int parallel)
 
 bool Fft::init() {
 
-    if (select_platform() && setup_cl() && setup_clFft() && setup_buffers())
+    if (select_platform() && 
+        setup_cl() &&
+        setup_clFft() && 
+        setup_forward() &&
+        setup_backward() && 
+        setup_buffers())
         return true;
     return false;
 }
@@ -47,41 +52,32 @@ void Fft::shutdown() {
 bool Fft::forward(FftJob& job) {
     cl_int err = 0;
    
-    cl_event writes[2]  = {0};
-    cl_event reads[2] = {0};
+    cl_event write = 0;
+    cl_event read = 0;
     cl_event transform = 0;
 
     // get buffer (may block)
     FftBuffer* buffer = get_buffer();
-    // temp - no buffer? return false
     if (NULL == buffer)
         return NULL;
     buffer->set_job(&job);
 
-    // Enqueue write tab array into _local_buffers[0]. 
-    err = clEnqueueWriteBuffer(_queue, buffer->in_real(), CL_FALSE, 0, 
-                                buffer->buffer_size(), buffer->data_real(), 0, NULL, &writes[0]);
-    CHECK("clEnqueueWriteBuffer real");
-
-    err = clEnqueueWriteBuffer(_queue, buffer->in_imag(), CL_FALSE, 0,
-                                buffer->buffer_size(), buffer->data_imag(), 0, NULL, &writes[1]);
-    CHECK("clEnqueueWriteBuffer imag");
+    // Enqueue write tab array into _local_buffers[0]
+    err = clEnqueueWriteBuffer(_queue, buffer->data(), CL_FALSE, 0, 
+                                buffer->size(), buffer->job_data(), 0, NULL, &write);
+    CHECK("clEnqueueWriteBuffer");
 
     // Enqueue the FFT
-    err = clfftEnqueueTransform(_planHandle, CLFFT_FORWARD, 1, &_queue, 2, writes, &transform,
-                                 buffer->in_buffers(), buffer->out_buffers(), buffer->temp_buffer());
+    err = clfftEnqueueTransform(_forward, CLFFT_FORWARD, 1, &_queue, 1, &write, &transform,
+                                 buffer->data_addr(), NULL, buffer->temp());
     CHECK("clEnqueueTransform");
 
     // Copy result to input array
-    err = clEnqueueReadBuffer(_queue, buffer->out_real(), CL_FALSE, 0,
-                               buffer->buffer_size(), buffer->data_real(), 1, &transform, &reads[0]);
-    CHECK("clEnqueueReadBuffer real");
+    err = clEnqueueReadBuffer(_queue, buffer->data(), CL_FALSE, 0,
+                               buffer->size(), buffer->job_data(), 1, &transform, &read);
+    CHECK("clEnqueueReadBuffer");
 
-    err = clEnqueueReadBuffer(_queue, buffer->out_imag(), CL_FALSE, 0, 
-                               buffer->buffer_size(), buffer->data_imag(), 1, &transform, &reads[1]);
-    CHECK("clEnqueueReadBuffer imag");
-
-    buffer->set_wait(reads);
+    buffer->set_wait(read);
 
     return true;
 }
@@ -90,41 +86,32 @@ bool Fft::forward(FftJob& job) {
 bool Fft::backward(FftJob& job) {
     cl_int err = 0;
    
-    cl_event writes[2]  = {0};
-    cl_event reads[2] = {0};
+    cl_event write = 0;
+    cl_event read = 0;
     cl_event transform = 0;
 
     // get buffer (may block)
     FftBuffer* buffer = get_buffer();
-    // temp - no buffer? return false
     if (NULL == buffer)
         return NULL;
     buffer->set_job(&job);
 
-    // Enqueue write tab array into _local_buffers[0]. 
-    err = clEnqueueWriteBuffer(_queue, buffer->in_real(), CL_FALSE, 0, 
-                                buffer->buffer_size(), buffer->data_real(), 0, NULL, &writes[0]);
-    CHECK("clEnqueueWriteBuffer real");
-
-    err = clEnqueueWriteBuffer(_queue, buffer->in_imag(), CL_FALSE, 0,
-                                buffer->buffer_size(), buffer->data_imag(), 0, NULL, &writes[1]);
-    CHECK("clEnqueueWriteBuffer imag");
+    // Enqueue write tab array into _local_buffers[0]
+    err = clEnqueueWriteBuffer(_queue, buffer->data(), CL_FALSE, 0, 
+                                buffer->size(), buffer->job_data(), 0, NULL, &write);
+    CHECK("clEnqueueWriteBuffer");
 
     // Enqueue the FFT
-    err = clfftEnqueueTransform(_planHandle, CLFFT_BACKWARD, 1, &_queue, 2, writes, &transform,
-                                 buffer->in_buffers(), buffer->out_buffers(), buffer->temp_buffer());
+    err = clfftEnqueueTransform(_backward, CLFFT_BACKWARD, 1, &_queue, 1, &write, &transform,
+                                 buffer->data_addr(), NULL, buffer->temp());
     CHECK("clEnqueueTransform");
 
     // Copy result to input array
-    err = clEnqueueReadBuffer(_queue, buffer->out_real(), CL_FALSE, 0,
-                               buffer->buffer_size(), buffer->data_real(), 1, &transform, &reads[0]);
-    CHECK("clEnqueueReadBuffer real");
+    err = clEnqueueReadBuffer(_queue, buffer->data(), CL_FALSE, 0,
+                               buffer->size(), buffer->job_data(), 1, &transform, &read);
+    CHECK("clEnqueueReadBuffer");
 
-    err = clEnqueueReadBuffer(_queue, buffer->out_imag(), CL_FALSE, 0, 
-                               buffer->buffer_size(), buffer->data_imag(), 1, &transform, &reads[1]);
-    CHECK("clEnqueueReadBuffer imag");
-
-    buffer->set_wait(reads);
+    buffer->set_wait(read);
 
     return true;
 }
@@ -138,7 +125,7 @@ void Fft::wait_all() {
 
 size_t Fft::get_temp_buffer_size() {
     size_t size = 0;
-    int status = clfftGetTmpBufSize(_planHandle, &size);
+    int status = clfftGetTmpBufSize(_forward, &size);
     return 0 == status ? size : 0;
 }
 
@@ -200,30 +187,63 @@ bool Fft::setup_clFft() {
     err = clfftInitSetupData(&fftSetup);
     CHECK("clfftInitSetupData");
     err = clfftSetup(&fftSetup);
-    CHECK("clfftSetup");    
+    CHECK("clfftSetup");
     
-    // Size of FFT. 
+    return true;    
+}
+
+bool Fft::setup_forward() {
+    cl_int err = 0;
+    
+    // Size of FFT 
     size_t clLengths = _fft_size;
     clfftDim dim = CLFFT_1D;
     
-    // Create a default plan for a complex FFT. 
-    err = clfftCreateDefaultPlan(&_planHandle, _context, dim, &clLengths);
+    // Create a default plan for a complex FFT 
+    err = clfftCreateDefaultPlan(&_forward, _context, dim, &clLengths);
     CHECK("clfftCreateDefaultPlan");
 
-    // Set plan parameters. 
-    err = clfftSetPlanPrecision(_planHandle, CLFFT_SINGLE);
+    // Set plan parameters
+    err = clfftSetPlanPrecision(_forward, CLFFT_SINGLE);
     CHECK("clfftSetPlanPrecision");
-    err = clfftSetLayout(_planHandle, CLFFT_COMPLEX_PLANAR, CLFFT_COMPLEX_PLANAR);
+    err = clfftSetLayout(_forward, CLFFT_REAL, CLFFT_HERMITIAN_INTERLEAVED);
     CHECK("clfftSetLayout");
-    err = clfftSetResultLocation(_planHandle, CLFFT_OUTOFPLACE);
+    err = clfftSetResultLocation(_forward, CLFFT_INPLACE);
     CHECK("clfftSetResultLocation");
 
     // Bake the plan
-    err = clfftBakePlan(_planHandle, 1, &_queue, NULL, NULL);
+    err = clfftBakePlan(_forward, 1, &_queue, NULL, NULL);
     CHECK("clfftBakePlan");
 
     return true;
 }
+
+bool Fft::setup_backward() {
+    cl_int err = 0;
+
+    // Size of FFT
+    size_t clLengths = _fft_size;
+    clfftDim dim = CLFFT_1D;
+    
+    // Create a default plan for a complex FFT 
+    err = clfftCreateDefaultPlan(&_backward, _context, dim, &clLengths);
+    CHECK("clfftCreateDefaultPlan");
+
+    // Set plan parameters
+    err = clfftSetPlanPrecision(_backward, CLFFT_SINGLE);
+    CHECK("clfftSetPlanPrecision");
+    err = clfftSetLayout(_backward, CLFFT_HERMITIAN_INTERLEAVED, CLFFT_REAL);
+    CHECK("clfftSetLayout");
+    err = clfftSetResultLocation(_backward, CLFFT_INPLACE);
+    CHECK("clfftSetResultLocation");
+
+    // Bake the plan
+    err = clfftBakePlan(_backward, 1, &_queue, NULL, NULL);
+    CHECK("clfftBakePlan");
+
+    return true;
+}
+
 
 bool Fft::setup_buffers() {
     for (int i = 0; i < _parallel; ++i) {
