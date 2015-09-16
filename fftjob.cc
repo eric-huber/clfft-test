@@ -111,9 +111,9 @@ void FftJob::write_hermitian(std::string filename) {
     std::ofstream ofs;
     ofs.open(filename);
     
-    for (int i = 0; i < _size; i += 2) {
-        auto real = _data[i];
-        auto imag = _data[i];
+    for (int i = 0; i < _size / 2; ++i) {
+        auto real = at_hr(i);
+        auto imag = at_hi(i);
         auto amplitude = sqrt(real * real + imag * imag);
         auto phase = atan2(imag, real);
         ofs << real << ", " << imag << ", " << amplitude << ", " << phase << std::endl;
