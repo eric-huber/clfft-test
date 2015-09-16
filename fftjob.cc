@@ -58,6 +58,18 @@ double FftJob::quant_error_energy(FftJob& inverse) {
     return energy;
 }
 
+void FftJob::populate(FftJob::TestData data_type) {
+    switch (data_type) {
+    case PERIODIC:
+    default:
+        periodic();
+        break;
+    case RANDOM:
+        randomize(2, -1);
+        break;
+    }
+}
+
 void FftJob::randomize(double range, double min) {
     
     srand(time(NULL));

@@ -18,8 +18,8 @@ const char* _data_file_name = "fft-data.txt";
 const char* _fft_file_name  = "fft-forward.txt";
 const char* _bak_file_name  = "fft-backward.txt";
 
-void test_fft(size_t size, Fft::Device device, int parallel, 
-              long count, double range, double min) {
+void test_fft(size_t size, Fft::Device device, FftJob::TestData test_data, 
+		      int parallel, long count, double range, double min) {
 
     Fft fft(size, device, parallel);
     if (!fft.init()) {
@@ -28,9 +28,7 @@ void test_fft(size_t size, Fft::Device device, int parallel,
     }
     
     FftJob job(size);
-    //job.randomize(range, min);
-    job.periodic();
-
+    job.populate(test_data);
     job.write(_data_file_name);
 
     // perform fft
@@ -47,8 +45,8 @@ void test_fft(size_t size, Fft::Device device, int parallel,
     // cleanup
 }
 
-void reverse_fft(size_t size, Fft::Device device, int parallel, 
-                 long count, double range, double min) {
+void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data, 
+	             int parallel, long count, double range, double min) {
 
     Fft fft(size, device, parallel);
     if (!fft.init()) {
@@ -57,7 +55,7 @@ void reverse_fft(size_t size, Fft::Device device, int parallel,
     }
     
     FftJob forward(size);
-    forward.periodic();
+    forward.populate(test_data);
     
     forward.write(_data_file_name);
     
@@ -87,8 +85,8 @@ void reverse_fft(size_t size, Fft::Device device, int parallel,
     fft.shutdown();
 }
 
-void time_fft(size_t size, Fft::Device device, int parallel, 
-             long count, double range, double min) {
+void time_fft(size_t size, Fft::Device device, FftJob::TestData test_data, 
+	      int parallel, long count, double range, double min) {
 
     cout << "Timing..." << endl;
 
@@ -107,7 +105,7 @@ void time_fft(size_t size, Fft::Device device, int parallel,
         
         // randomize data 
         for (auto job : jobs) {
-            job.randomize(range, min);
+            job.populate(test_data);
         }
         
         // start timer
@@ -163,14 +161,15 @@ void time_fft(size_t size, Fft::Device device, int parallel,
 
 int main(int ac, char* av[]) {
 
-    size_t          fft_size        = 8192;
-    Fft::Device     device          = Fft::GPU; 
-    bool            reverse         = false;
-    bool            time            = false;
-    int             parallel        = 16;
-    long            count           = 1e9;
-    double          range           = 25.0;
-    double          min             = 0.0;
+    size_t              fft_size        = 8192;
+    Fft::Device         device          = Fft::GPU;
+    FftJob::TestData    test_data       = FftJob::RANDOM;
+    bool                inverse         = false;
+    bool                time            = false;
+    int                 parallel        = 16;
+    long                count           = 1e9;
+    double              range           = 25.0;
+    double              min             = 0.0;
 
     try {
         
@@ -179,13 +178,16 @@ int main(int ac, char* av[]) {
         desc.add_options()
         ("help,h",      "Produce help message")
         ("cpu,c",       "Force CPU usage")
-        ("reverse,r",   "Perform an FFT, then an inverse FFT on the same buffer")
+        
+        ("inverse,i",   "Perform an FFT, then an inverse FFT on the same buffer")
         ("time,t",      "Time the FFT operation")
-        ("parallel,p",  po::value<int>(), "Jobs to perform in parallel")
-        ("iter,i",      po::value<long>(), "Set the number of iterations to perform")
-        ("size,s",      po::value<int>(), "Set the size of the buffer buffer [8192]")
-        ("range,a",     po::value<double>(), "Set the range of the random buffer [25.0]")
-        ("min,m",       po::value<double>(), "Set the minimum value of the random buffer [0.0]");
+        
+        ("periodic,p",  "Use a periodic data set")
+        ("random,r",    "Use a gaussian distributed random data set")
+        
+        ("jobs,j",      po::value<int>(), "Jobs to perform in parallel")
+        ("loops,l",     po::value<long>(), "Set the number of iterations to perform")
+        ("size,s",      po::value<int>(), "Set the size of the buffer [8192]");
 
         po::variables_map vm;
         po::store(po::parse_command_line(ac, av, desc), vm);
@@ -200,32 +202,32 @@ int main(int ac, char* av[]) {
             device = Fft::CPU;
         }
         
-        if (vm.count("reverse")) {
-            reverse = true;
+        if (vm.count("inverse")) {
+            inverse = true;
         }
         
         if (vm.count("time")) {
             time = true;
         }
         
-        if (vm.count("parallel")) {
-            parallel = vm["parallel"].as<int>();
+        if (vm.count("periodic")) {
+        	test_data = FftJob::PERIODIC;
+        }
+        
+        if (vm.count("random")) {
+        	test_data = FftJob::RANDOM;
+        }
+        
+        if (vm.count("jobs")) {
+            parallel = vm["jobs"].as<int>();
         }
 
-        if (vm.count("iter")) {
-            count = vm["iter"].as<long>();
+        if (vm.count("loops")) {
+            count = vm["loops"].as<long>();
         }
 
         if (vm.count("size")) {
             fft_size = vm["size"].as<int>();
-        }
-        
-        if (vm.count("range")) {
-            range = vm["range"].as<double>();
-        }
-        
-        if (vm.count("min")) {
-            min = vm["min"].as<double>();
         }
 
     } catch (exception& e) {
@@ -239,12 +241,12 @@ int main(int ac, char* av[]) {
     // to nearest 16
     count = ((int) ceil(count / parallel)) * parallel;
 
-    if (reverse)
-        reverse_fft(fft_size, device, parallel, count, range, min);
+    if (inverse)
+        inverse_fft(fft_size, device, test_data, parallel, count, range, min);
     else if (time)    
-        time_fft(fft_size, device, parallel, count, range, min);
+        time_fft(fft_size, device, test_data, parallel, count, range, min);
     else
-        test_fft(fft_size, device, parallel, count, range, min);
+        test_fft(fft_size, device, test_data, parallel, count, range, min);
     
     return 0;
 }

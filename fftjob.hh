@@ -2,7 +2,9 @@
 #include <string>
 
 class FftJob {
-
+public:
+    enum TestData  {PERIODIC, RANDOM};
+    
 public:
     FftJob(size_t fft_size);
     ~FftJob();
@@ -15,8 +17,7 @@ public:
     double      signal_energy();
     double      quant_error_energy(FftJob& inverse);  
 
-    void        randomize(double range, double min);
-    void        periodic();
+    void        populate(TestData data_type);
 
     void        scale(double factor);
 
@@ -34,7 +35,11 @@ public:
     
     int         size()              { return _size; }
     int         size_h()            { return _size / 2; }
-  
+
+private:
+    void        randomize(double range, double min);
+    void        periodic();
+    
 private:
     size_t      _size;
 
