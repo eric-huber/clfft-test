@@ -96,24 +96,27 @@ void time_fft(size_t size, Fft::Device device, FftJob::TestData test_data,
         return;
     }
 
-    vector<FftJob> jobs;
-
+    vector<FftJob*> jobs;
+    for (int i = 0; i < parallel; ++i) {
+        jobs.push_back(new FftJob(size));
+    }
+    
     nanoseconds total_duration(0);
     int last_percent = -1;
 
     for (int outer = 0; outer < count; outer += parallel) {
         
-        // randomize data 
+        // randomize data
         for (auto job : jobs) {
-            job.populate(test_data);
+            job->populate(test_data);
         }
-        
+            
         // start timer
         high_resolution_clock::time_point start = high_resolution_clock::now();
     
         // queue ffts
         for (auto job : jobs) {
-            fft.forward(job);
+            fft.forward(*job);
         }
     
         // wait for completion
