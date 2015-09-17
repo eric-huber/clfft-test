@@ -87,6 +87,68 @@ void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data,
     fft.shutdown();
 }
 
+void inverse_fft_loop(size_t size, Fft::Device device,  FftJob::TestData test_data, 
+	                  int parallel, long count, double range, double min) {
+
+
+    Fft fft(size, device, parallel);
+    if (!fft.init()) {
+        fft.shutdown();
+        return;
+    }
+    
+    double sqer = 0;
+    int last_percent = -1;
+    
+    for (int l = 0; l < count; ++l) {
+    
+        FftJob data(size);
+        data.populate(test_data);
+        
+        // perform fft
+        FftJob forward(size);
+        forward.copy(data); // we need to preserve the original data - in place clobbers it
+        fft.forward(forward);
+        fft.wait_all();
+        
+        // buffer for inversion
+        FftJob reverse(size);
+        reverse.copy(forward);
+        
+        // reverse
+        fft.backward(reverse);
+        fft.wait_all();
+
+        sqer += data.signal_to_quant_error(reverse);
+        
+        // update user
+        int percent = (int) round((double) l / (double) count * 100.0);
+        if (percent != last_percent) {
+            cerr << "\r" << percent << " %";
+            cerr.flush();
+            last_percent = percent;
+        } 
+    }
+        
+    sqer /= (double) count;
+    
+    cerr << "\r100 %" << endl;
+    cout << endl;
+    cout << "Hardware:   ";
+    if (Fft::CPU == device)
+        cout << "CPU" << endl;
+    else
+        cout << "GPU" << endl;
+    cout << "Precision:  Single" << endl;
+    cout << "Parallel:   " << parallel << endl;
+    cout << "Iterations: " << count << endl;
+    cout << "Data size:  " << size << endl;    
+    cout << "Ave Signal to Quantinization Error: " << std::setprecision(4) 
+        << sqer << endl;
+    
+    fft.shutdown();
+}
+
 void time_fft(size_t size, Fft::Device device, FftJob::TestData test_data, 
 	      int parallel, long count, double range, double min) {
 
@@ -170,9 +232,10 @@ int main(int ac, char* av[]) {
     Fft::Device         device          = Fft::GPU;
     FftJob::TestData    test_data       = FftJob::RANDOM;
     bool                inverse         = false;
+    bool                inverse_loop    = false;
     bool                time            = false;
     int                 parallel        = 16;
-    long                count           = 1e9;
+    long                count           = 1000;
     double              range           = 25.0;
     double              min             = 0.0;
 
@@ -181,18 +244,19 @@ int main(int ac, char* av[]) {
         po::options_description desc("Allowed options");
     
         desc.add_options()
-        ("help,h",      "Produce help message")
-        ("cpu,c",       "Force CPU usage")
+        ("help,h",         "Produce help message")
+        ("cpu,c",          "Force CPU usage")
+
+        ("inverse,i",      "Perform an FFT, then an inverse FFT on the same buffer")
+        ("inverse-loop,v", "Compute average SQER")
+        ("time,t",         "Time the FFT operation")
         
-        ("inverse,i",   "Perform an FFT, then an inverse FFT on the same buffer")
-        ("time,t",      "Time the FFT operation")
+        ("periodic,p",     "Use a periodic data set")
+        ("random,r",       "Use a gaussian distributed random data set")
         
-        ("periodic,p",  "Use a periodic data set")
-        ("random,r",    "Use a gaussian distributed random data set")
-        
-        ("jobs,j",      po::value<int>(), "Jobs to perform in parallel")
-        ("loops,l",     po::value<long>(), "Set the number of iterations to perform")
-        ("size,s",      po::value<int>(), "Set the size of the buffer [8192]");
+        ("jobs,j",         po::value<int>(), "Jobs to perform in parallel")
+        ("loops,l",        po::value<long>(), "Set the number of iterations to perform")
+        ("size,s",         po::value<int>(), "Set the size of the buffer [8192]");
 
         po::variables_map vm;
         po::store(po::parse_command_line(ac, av, desc), vm);
@@ -209,6 +273,10 @@ int main(int ac, char* av[]) {
         
         if (vm.count("inverse")) {
             inverse = true;
+        }
+        
+        if (vm.count("inverse-loop")) {
+            inverse_loop = true;
         }
         
         if (vm.count("time")) {
@@ -248,6 +316,8 @@ int main(int ac, char* av[]) {
 
     if (inverse)
         inverse_fft(fft_size, device, test_data, parallel, count, range, min);
+    else if (inverse_loop)
+        inverse_fft_loop(fft_size, device, test_data, parallel, count, range, min);
     else if (time)    
         time_fft(fft_size, device, test_data, parallel, count, range, min);
     else
