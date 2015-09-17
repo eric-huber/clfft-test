@@ -54,12 +54,14 @@ void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data,
         return;
     }
     
-    FftJob forward(size);
-    forward.populate(test_data);
+    FftJob data(size);
+    data.populate(test_data);
     
-    forward.write(_data_file_name);
+    data.write(_data_file_name);
     
     // perform fft
+    FftJob forward(size);
+    forward.copy(data); // we need to preserve the original data - in place clobbers it
     fft.forward(forward);
     fft.wait_all();
     
@@ -78,9 +80,9 @@ void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data,
     cout << "FFT/IFFT computed." << endl;
     cout << "Data saved." << endl;
     cout << "Root Mean Square :              " << std::setprecision(4) 
-        << forward.rms(reverse) << endl;
+        << data.rms(reverse) << endl;
     cout << "Signal to Quantinization Error: " << std::setprecision(4) 
-        << forward.signal_to_quant_error(reverse) << endl;
+        << data.signal_to_quant_error(reverse) << endl;
     
     fft.shutdown();
 }
