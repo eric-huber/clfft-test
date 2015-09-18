@@ -6,7 +6,7 @@ public:
     enum TestData  {PERIODIC, RANDOM};
     
 public:
-    FftJob(size_t fft_size);
+    FftJob(size_t fft_size, double mean, double std);
     ~FftJob();
     
 public:
@@ -37,11 +37,13 @@ public:
     int         size_h()            { return _size / 2; }
 
 private:
-    void        randomize(double mean, double std);
+    void        randomize();
     void        periodic();
     
 private:
     size_t      _size;
+    double      _mean;
+    double      _std;
 
     cl_float*   _data;
 };

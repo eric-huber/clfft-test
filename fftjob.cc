@@ -8,8 +8,10 @@
 #include <random>
 #include <math.h>
 
-FftJob::FftJob(size_t size) 
- : _size(size)
+FftJob::FftJob(size_t size, double mean, double std) 
+ : _size(size),
+   _mean(mean),
+   _std(std)
 {
     _data  = new cl_float[_size];
 }
@@ -66,15 +68,15 @@ void FftJob::populate(FftJob::TestData data_type) {
         periodic();
         break;
     case RANDOM:
-        randomize(0.5, 0.2);
+        randomize();
         break;
     }
 }
 
-void FftJob::randomize(double mean, double std) {
+void FftJob::randomize() {
     
     std::default_random_engine       generator(std::random_device{}());
-    std::normal_distribution<double> distribution(mean, std);
+    std::normal_distribution<double> distribution(_mean, _std);
     
     srand(time(NULL));
 
@@ -87,7 +89,7 @@ void FftJob::randomize(double mean, double std) {
 void FftJob::periodic() {
     for (int i = 0; i < _size; ++i) {
         double t = i * .002;
-        double amp = sin(2 * M_PI * t); 
+        double amp = sin(2 * M_PI * t) + 1; 
         _data[i] = amp;
     }
 }

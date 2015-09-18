@@ -19,7 +19,7 @@ const char* _fft_file_name  = "fft-forward.txt";
 const char* _bak_file_name  = "fft-backward.txt";
 
 void test_fft(size_t size, Fft::Device device, FftJob::TestData test_data, 
-		      int parallel, long count, double range, double min) {
+		      int parallel, long count, double mean, double std) {
 
     Fft fft(size, device, parallel);
     if (!fft.init()) {
@@ -27,7 +27,7 @@ void test_fft(size_t size, Fft::Device device, FftJob::TestData test_data,
         return;
     }
     
-    FftJob job(size);
+    FftJob job(size, mean, std);
     job.populate(test_data);
     job.write(_data_file_name);
 
@@ -46,7 +46,7 @@ void test_fft(size_t size, Fft::Device device, FftJob::TestData test_data,
 }
 
 void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data, 
-	             int parallel, long count, double range, double min) {
+	             int parallel, long count, double mean, double std) {
 
     Fft fft(size, device, parallel);
     if (!fft.init()) {
@@ -54,13 +54,13 @@ void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data,
         return;
     }
     
-    FftJob data(size);
+    FftJob data(size, mean, std);
     data.populate(test_data);
     
     data.write(_data_file_name);
     
     // perform fft
-    FftJob forward(size);
+    FftJob forward(size, mean, std);
     forward.copy(data); // we need to preserve the original data - in place clobbers it
     fft.forward(forward);
     fft.wait_all();
@@ -68,7 +68,7 @@ void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data,
     forward.write_hermitian(_fft_file_name);
     
     // buffer for inversion
-    FftJob reverse(size);
+    FftJob reverse(size, mean, std);
     reverse.copy(forward);
     
     // reverse
@@ -88,7 +88,7 @@ void inverse_fft(size_t size, Fft::Device device,  FftJob::TestData test_data,
 }
 
 void inverse_fft_loop(size_t size, Fft::Device device,  FftJob::TestData test_data, 
-	                  int parallel, long count, double range, double min) {
+	                  int parallel, long count, double mean, double std) {
 
 
     Fft fft(size, device, parallel);
@@ -102,17 +102,17 @@ void inverse_fft_loop(size_t size, Fft::Device device,  FftJob::TestData test_da
     
     for (int l = 0; l < count; ++l) {
     
-        FftJob data(size);
+        FftJob data(size, mean, std);
         data.populate(test_data);
         
         // perform fft
-        FftJob forward(size);
+        FftJob forward(size, mean, std);
         forward.copy(data); // we need to preserve the original data - in place clobbers it
         fft.forward(forward);
         fft.wait_all();
         
         // buffer for inversion
-        FftJob reverse(size);
+        FftJob reverse(size, mean, std);
         reverse.copy(forward);
         
         // reverse
@@ -142,7 +142,15 @@ void inverse_fft_loop(size_t size, Fft::Device device,  FftJob::TestData test_da
     cout << "Precision:  Single" << endl;
     cout << "Parallel:   " << parallel << endl;
     cout << "Iterations: " << count << endl;
-    cout << "Data size:  " << size << endl;    
+    cout << "Data size:  " << size << endl;
+    cout << "Data type:  ";
+    if (FftJob::PERIODIC) {
+        cout << "Periodic" << endl;
+    } else {
+        cout << "Random" << endl;
+        cout << "Mean:      " << mean << endl;
+        cout << "Std:       " << std << endl;
+    }   
     cout << "Ave Signal to Quantinization Error: " << std::setprecision(4) 
         << sqer << endl;
     
@@ -150,7 +158,7 @@ void inverse_fft_loop(size_t size, Fft::Device device,  FftJob::TestData test_da
 }
 
 void time_fft(size_t size, Fft::Device device, FftJob::TestData test_data, 
-	      int parallel, long count, double range, double min) {
+	      int parallel, long count, double mean, double std) {
 
     cout << "Timing..." << endl;
 
@@ -162,7 +170,7 @@ void time_fft(size_t size, Fft::Device device, FftJob::TestData test_data,
 
     vector<FftJob*> jobs;
     for (int i = 0; i < parallel; ++i) {
-        jobs.push_back(new FftJob(size));
+        jobs.push_back(new FftJob(size, mean, std));
     }
     
     nanoseconds total_duration(0);
@@ -219,8 +227,14 @@ void time_fft(size_t size, Fft::Device device, FftJob::TestData test_data,
     cout << "Parallel:   " << parallel << endl;
     cout << "Iterations: " << count << endl;
     cout << "Data size:  " << size << endl;
-    cout << "Range:      " << range << endl;
-    cout << "Min:        " << min << endl;
+    cout << "Data type:  ";
+    if (FftJob::PERIODIC) {
+        cout << "Periodic" << endl;
+    } else {
+        cout << "Random" << endl;
+        cout << "Mean:      " << mean << endl;
+        cout << "Std:       " << std << endl;
+    }
     cout << endl;
     cout << "Time:       " << total_duration.count() << " ns" << endl;
     cout << "Average:    " << ave << " ns (" << (ave / 1000.0) << " μs)" << endl;  
@@ -236,8 +250,8 @@ int main(int ac, char* av[]) {
     bool                time            = false;
     int                 parallel        = 16;
     long                count           = 1000;
-    double              range           = 25.0;
-    double              min             = 0.0;
+    double              mean            = 0.5;
+    double              std             = 0.2;
 
     try {
         
@@ -253,6 +267,8 @@ int main(int ac, char* av[]) {
         
         ("periodic,p",     "Use a periodic data set")
         ("random,r",       "Use a gaussian distributed random data set")
+        ("mean,m",         po::value<double>(), "Mean for random data")
+        ("deviation,d",    po::value<double>(), "Standard deviation for random data")
         
         ("jobs,j",         po::value<int>(), "Jobs to perform in parallel")
         ("loops,l",        po::value<long>(), "Set the number of iterations to perform")
@@ -291,6 +307,14 @@ int main(int ac, char* av[]) {
         	test_data = FftJob::RANDOM;
         }
         
+        if (vm.count("mean")) {
+            mean = vm["mean"].as<double>();
+        }
+
+        if (vm.count("deviation")) {
+            std = vm["deviation"].as<double>();
+        }
+        
         if (vm.count("jobs")) {
             parallel = vm["jobs"].as<int>();
         }
@@ -315,13 +339,13 @@ int main(int ac, char* av[]) {
     count = ((int) ceil(count / parallel)) * parallel;
 
     if (inverse)
-        inverse_fft(fft_size, device, test_data, parallel, count, range, min);
+        inverse_fft(fft_size, device, test_data, parallel, count, mean, std);
     else if (inverse_loop)
-        inverse_fft_loop(fft_size, device, test_data, parallel, count, range, min);
+        inverse_fft_loop(fft_size, device, test_data, parallel, count, mean, std);
     else if (time)    
-        time_fft(fft_size, device, test_data, parallel, count, range, min);
+        time_fft(fft_size, device, test_data, parallel, count, mean, std);
     else
-        test_fft(fft_size, device, test_data, parallel, count, range, min);
+        test_fft(fft_size, device, test_data, parallel, count, mean, std);
     
     return 0;
 }
